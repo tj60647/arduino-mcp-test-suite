@@ -5,3 +5,7 @@ reports/*.json
 .env
 .vercel
 *.log
+*.tsbuildinfo
+apps/**/dist/
+apps/web/.next/
+apps/web/data/runs.json

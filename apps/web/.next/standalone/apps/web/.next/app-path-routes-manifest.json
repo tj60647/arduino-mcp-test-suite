@@ -1,6 +1,0 @@
-{
-  "/api/health/route": "/api/health",
-  "/api/runs/route": "/api/runs",
-  "/_not-found/page": "/_not-found",
-  "/page": "/"
-}
