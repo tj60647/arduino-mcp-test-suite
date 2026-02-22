@@ -518,6 +518,25 @@ export default function HomePage() {
     }
   }
 
+  async function handleClearResults(): Promise<void> {
+    setIsBusy(true);
+    setMessage('');
+    try {
+      await repository.replaceAll([]);
+      try {
+        await fetch('/api/runs', { method: 'DELETE' });
+      } catch {
+        // ignore temporary API issues; local clear is still applied
+      }
+      setRuns([]);
+      setMessage('Cleared all saved results for this local environment.');
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   function handleSelectJobEndpoint(id: string): void {
     setJobEndpointId(id);
     if (!id) {
@@ -1183,10 +1202,39 @@ export default function HomePage() {
           Run test
         </h2>
         <p className="section-desc">
-          Pick your endpoint and run a quick test.
+          Pick your endpoint, enter one input, and run.
         </p>
 
         <div className="queue-panel">
+          <div className="form-row" style={{ marginTop: 10 }}>
+            <div className="form-field">
+              <label htmlFor="job-endpoint-select">Endpoint</label>
+              <select
+                id="job-endpoint-select"
+                value={jobEndpointId}
+                onChange={(e) => handleSelectJobEndpoint(e.target.value)}
+                disabled={isBusy || isJobBusy || isSingleInputBusy}
+              >
+                <option value="">Custom endpoint</option>
+                {endpoints.map((ep) => (
+                  <option key={ep.id} value={ep.id}>
+                    {ep.name} ({transportLabel(ep.transport)})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-field">
+              <label htmlFor="job-server-name">Server label</label>
+              <input
+                id="job-server-name"
+                type="text"
+                value={jobServerName}
+                onChange={(e) => setJobServerName(e.target.value)}
+                disabled={isBusy || isJobBusy || isSingleInputBusy}
+              />
+            </div>
+          </div>
+
           <p className="cmd-label" style={{ marginTop: 20 }}>
             Single input test (live):
           </p>
@@ -1229,65 +1277,24 @@ export default function HomePage() {
             </div>
           ) : null}
 
-          <p className="cmd-label" style={{ marginTop: 20 }}>
-            Quick MCP test:
-          </p>
-          <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
-            Pick an endpoint and click <strong>Run quick test</strong>. If no runner is online, your
-            test waits in queue until one connects.
-          </p>
-          <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
-            Run quick test performs a real MCP initialize + tool discovery call (live mode), then stores
-            the result summary below.
-          </p>
+          {showAdvancedControls ? (
+            <>
+              <p className="cmd-label" style={{ marginTop: 20 }}>
+                Advanced quick MCP test:
+              </p>
+              <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
+                Queue benchmark-oriented quick tests and inspect background job events.
+              </p>
 
-          {onlineWorkerCount === 0 ? (
-            <p className="help-text" style={{ marginTop: 0, marginBottom: 12 }}>
-              No runner online right now. Quick test will run directly from web. To use queue mode, start a runner with:
-              {' '}
-              <code>npm run run-worker -- --control-plane http://localhost:3000</code>
-            </p>
-          ) : null}
-
-          <div className="form-row" style={{ marginTop: 10 }}>
-            <div className="form-field">
-              <label htmlFor="job-endpoint-select">Endpoint</label>
-              <select
-                id="job-endpoint-select"
-                value={jobEndpointId}
-                onChange={(e) => handleSelectJobEndpoint(e.target.value)}
-                disabled={isBusy || isJobBusy}
-              >
-                <option value="">Custom endpoint</option>
-                {endpoints.map((ep) => (
-                  <option key={ep.id} value={ep.id}>
-                    {ep.name} ({transportLabel(ep.transport)})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="job-server-name">Server label</label>
-              <input
-                id="job-server-name"
-                type="text"
-                value={jobServerName}
-                onChange={(e) => setJobServerName(e.target.value)}
-                disabled={isBusy || isJobBusy}
-              />
-            </div>
-          </div>
-
-          <div className="toolbar">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => void handleCreateQuickJob()}
-              disabled={isBusy || isJobBusy}
-            >
-              Run quick test
-            </button>
-            {showAdvancedControls ? (
+              <div className="toolbar">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void handleCreateQuickJob()}
+                  disabled={isBusy || isJobBusy || isSingleInputBusy}
+                >
+                  Run quick test
+                </button>
               <button
                 type="button"
                 onClick={() => setShowAdvancedJobOptions((current) => !current)}
@@ -1295,14 +1302,17 @@ export default function HomePage() {
               >
                 {showAdvancedJobOptions ? 'Hide advanced options' : 'Show advanced options'}
               </button>
-            ) : null}
-            <button type="button" onClick={() => void refreshJobs()} disabled={isBusy || isJobBusy}>
-              Refresh jobs
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => void refreshJobs()}
+                  disabled={isBusy || isJobBusy}
+                >
+                  Refresh jobs
+                </button>
+              </div>
 
-          {showAdvancedControls && showAdvancedJobOptions ? (
-            <>
+              {showAdvancedJobOptions ? (
+                <>
           <div className="form-row">
             <div className="form-field">
               <label htmlFor="job-transport">Connection type</label>
@@ -1409,43 +1419,45 @@ export default function HomePage() {
               Queue advanced run
             </button>
           </div>
+                </>
+              ) : null}
+
+              <table style={{ marginTop: 14 }}>
+                <thead>
+                  <tr>
+                    <th>Created</th>
+                    <th>Server</th>
+                    <th>Pack</th>
+                    <th>Status</th>
+                    <th>Worker</th>
+                    <th>Latest event</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="empty-cell">
+                        No queued jobs yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    jobs.map((job) => (
+                      <tr key={job.id}>
+                        <td>{new Date(job.createdAt).toLocaleString()}</td>
+                        <td>{job.config.serverName}</td>
+                        <td>{job.config.benchmarkPack}</td>
+                        <td>
+                          <span className={statusBadgeClass(job.status)}>{job.status}</span>
+                        </td>
+                        <td>{job.workerId ?? '—'}</td>
+                        <td>{job.events[job.events.length - 1]?.message ?? '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </>
           ) : null}
-
-          <table style={{ marginTop: 14 }}>
-            <thead>
-              <tr>
-                <th>Created</th>
-                <th>Server</th>
-                <th>Pack</th>
-                <th>Status</th>
-                <th>Worker</th>
-                <th>Latest event</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="empty-cell">
-                    No queued jobs yet.
-                  </td>
-                </tr>
-              ) : (
-                jobs.map((job) => (
-                  <tr key={job.id}>
-                    <td>{new Date(job.createdAt).toLocaleString()}</td>
-                    <td>{job.config.serverName}</td>
-                    <td>{job.config.benchmarkPack}</td>
-                    <td>
-                      <span className={statusBadgeClass(job.status)}>{job.status}</span>
-                    </td>
-                    <td>{job.workerId ?? '—'}</td>
-                    <td>{job.events[job.events.length - 1]?.message ?? '—'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
 
@@ -1477,6 +1489,14 @@ export default function HomePage() {
             disabled={isBusy || runs.length === 0}
           >
             Export all runs
+          </button>
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={() => void handleClearResults()}
+            disabled={isBusy || runs.length === 0}
+          >
+            Clear all results
           </button>
         </div>
 

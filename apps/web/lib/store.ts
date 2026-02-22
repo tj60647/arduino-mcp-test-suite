@@ -34,3 +34,8 @@ export async function addRun(input: { team: string; submittedBy: string; report:
   await writeFile(dataPath, JSON.stringify(runs, null, 2), 'utf8');
   return item;
 }
+
+export async function clearRuns(): Promise<void> {
+  await ensureStore();
+  await writeFile(dataPath, '[]', 'utf8');
+}

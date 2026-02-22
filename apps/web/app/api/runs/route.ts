@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addRun, listRuns } from '@/lib/store';
+import { addRun, clearRuns, listRuns } from '@/lib/store';
 import { checkAuthHeader } from '@/lib/apiAuth';
 import { ingestPayloadSchema } from '@/lib/validation';
 
@@ -25,4 +25,9 @@ export async function POST(request: Request) {
 
   const stored = await addRun(parsed.data);
   return NextResponse.json({ id: stored.id, createdAt: stored.createdAt }, { status: 201 });
+}
+
+export async function DELETE() {
+  await clearRuns();
+  return NextResponse.json({ ok: true });
 }
