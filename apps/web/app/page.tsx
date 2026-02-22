@@ -31,6 +31,16 @@ function transportLabel(transport: McpEndpoint['transport']): string {
   return 'HTTP';
 }
 
+function endpointNameFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/[^a-zA-Z0-9-]/g, '-');
+    return `mcp-${host}`;
+  } catch {
+    return 'mcp-endpoint';
+  }
+}
+
 function parseStdioCommand(input: string): { command: string; args: string[] } {
   const parts = input
     .trim()
@@ -72,6 +82,8 @@ export default function HomePage() {
   const [endpoints, setEndpoints] = useState<McpEndpoint[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [quickEndpointUrl, setQuickEndpointUrl] = useState('');
+  const [showEndpointAdvanced, setShowEndpointAdvanced] = useState(false);
   const [endpointName, setEndpointName] = useState('');
   const [endpointTransport, setEndpointTransport] = useState<McpEndpoint['transport']>('sse');
   const [endpointUrlOrCommand, setEndpointUrlOrCommand] = useState('');
@@ -386,6 +398,75 @@ export default function HomePage() {
     }
   }
 
+  async function handleQuickEndpointConnect(): Promise<void> {
+    const endpointUrl = quickEndpointUrl.trim();
+    if (!endpointUrl) {
+      setMessage('Paste an MCP endpoint URL first.');
+      return;
+    }
+
+    try {
+      new URL(endpointUrl);
+    } catch {
+      setMessage('Enter a valid URL, e.g. https://your-server.example.com/mcp');
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage('');
+
+    try {
+      const existingByUrl = endpoints.find((ep) => ep.urlOrCommand.trim() === endpointUrl);
+      if (existingByUrl) {
+        setJobEndpointId(existingByUrl.id);
+        setJobServerName(existingByUrl.name);
+        setJobTransport(existingByUrl.transport);
+        setJobUrlOrCommand(existingByUrl.urlOrCommand);
+        setJobDryRun(false);
+        setMessage(`Endpoint selected: ${existingByUrl.name}`);
+        return;
+      }
+
+      const baseName = endpointNameFromUrl(endpointUrl);
+      const usedNames = new Set(endpoints.map((ep) => ep.name.toLowerCase()));
+      let candidate = baseName;
+      let suffix = 2;
+      while (usedNames.has(candidate.toLowerCase())) {
+        candidate = `${baseName}-${suffix}`;
+        suffix += 1;
+      }
+
+      await addEndpoint({
+        name: candidate,
+        transport: 'streamable-http',
+        urlOrCommand: endpointUrl,
+        notes: 'Quick connect'
+      });
+
+      const updated = await listEndpoints();
+      setEndpoints(updated);
+
+      const created = updated.find(
+        (ep) => ep.name === candidate && ep.urlOrCommand.trim() === endpointUrl
+      );
+
+      if (created) {
+        setJobEndpointId(created.id);
+        setJobServerName(created.name);
+        setJobTransport(created.transport);
+        setJobUrlOrCommand(created.urlOrCommand);
+        setJobDryRun(false);
+      }
+
+      setQuickEndpointUrl('');
+      setMessage(`Endpoint connected: ${candidate}. You can now click Queue quick test.`);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleDeleteEndpoint(id: string): Promise<void> {
     setIsBusy(true);
     setMessage('');
@@ -629,6 +710,44 @@ export default function HomePage() {
           reused when queuing jobs.
         </p>
 
+        <div className="form-row" style={{ marginTop: 4 }}>
+          <div className="form-field full-width">
+            <label htmlFor="quick-endpoint-url">Quick connect MCP endpoint URL</label>
+            <input
+              id="quick-endpoint-url"
+              type="text"
+              placeholder="https://late-cloud-eqizx.run.mcp-use.com/mcp"
+              value={quickEndpointUrl}
+              onChange={(e) => setQuickEndpointUrl(e.target.value)}
+              disabled={isBusy}
+            />
+            <p className="help-text">
+              Paste one URL and click connect. Use advanced options only if transport or metadata
+              needs customization.
+            </p>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => void handleQuickEndpointConnect()}
+            disabled={isBusy}
+          >
+            Connect endpoint
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowEndpointAdvanced((current) => !current)}
+            disabled={isBusy}
+          >
+            {showEndpointAdvanced ? 'Hide advanced endpoint options' : 'Show advanced endpoint options'}
+          </button>
+        </div>
+
+        {showEndpointAdvanced ? (
+          <>
         <div className="form-row">
           <div className="form-field">
             <label htmlFor="ep-name">Server name</label>
@@ -723,6 +842,8 @@ export default function HomePage() {
         >
           Save server profile
         </button>
+          </>
+        ) : null}
 
         {endpoints.length > 0 ? (
           <table style={{ marginTop: 24 }}>
