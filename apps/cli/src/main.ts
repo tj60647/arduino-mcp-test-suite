@@ -70,8 +70,8 @@ const program = new Command();
 program
   .name('run-suite')
   .description('Run MCP agent evaluation suite')
-  .option('--suite <name>', 'suite name', 'pilot')
-  .option('--pack <name>', 'benchmark pack id (e.g., arduino, general)', 'arduino')
+  .option('--suite <name>', 'suite name', 'general')
+  .option('--pack <name>', 'benchmark pack id (e.g., general)', 'general')
   .option('--server <name>', 'MCP server identifier', 'mcp-local')
   .option('--model <name>', 'model identifier', 'chatgpt-or-claude')
   .option('--cases <path>', 'path to eval cases (defaults to selected pack path)')

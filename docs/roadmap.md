@@ -9,7 +9,7 @@ Build a tool that can:
 - score both task outcomes and epistemic behavior
 - export reproducible reports for model/server comparison
 
-Initial benchmark pack: **Arduino**.
+Initial benchmark pack: **general MCP/API workflows**.
 
 ### In-scope (MVP)
 
@@ -22,19 +22,18 @@ Initial benchmark pack: **Arduino**.
 
 ### Out-of-scope (MVP)
 
-- Full autonomous circuit CAD generation
-- Automatic physical hardware orchestration across arbitrary labs
+- Physical device orchestration and flashing pipelines
 - Universal support for every model provider on day one
 
 ---
 
-## 2) Reference workflow fit (design prototyping)
+## 2) Reference workflow fit (API/agent systems)
 
-1. **Prompt hypothesis** (e.g., low-power temperature logger)
-2. **Generate candidate circuit + sketch** through MCP-enabled agent
-3. **Validate constraints** (voltage, current, pin conflicts, sampling timing)
-4. **Compile/simulate/upload** via MCP tools
-5. **Observe outputs** (logs/sensor behavior)
+1. **Prompt hypothesis** (e.g., compose/send a business letter)
+2. **Plan tool/API usage** through an MCP-enabled agent
+3. **Execute MCP tool calls** (HTTP endpoints, build/run/test, file operations)
+4. **Validate outputs** (schema validity, retries, idempotency, status handling)
+5. **Observe behavior** (trace quality, error recovery, clarification behavior)
 6. **Score** task + epistemic quality
 7. **Compare** model/server variants and iterate prompt/process
 
@@ -54,7 +53,7 @@ This keeps AI in a copilot role and preserves human verification gates.
 
 - **MCP Adapter Layer (`packages/mcp-adapters`)**
   - normalizes tool naming differences across servers
-  - declares capability map (`compile`, `upload`, `read_serial`, etc.)
+  - declares capability map (`http_request`, `build`, `run`, `test`, etc.)
 
 - **Scoring Engine (`packages/scoring`)**
   - objective checks (mechanistic/deterministic)
@@ -70,13 +69,13 @@ This keeps AI in a copilot role and preserves human verification gates.
   - report explorer and diff views
 
 - **Execution Workers (`apps/worker`)**
-  - local trusted hosts for toolchain/hardware-required tasks
+  - trusted hosts for MCP/API job execution
   - push run events/results to control plane
 
 ## Execution model for Vercel
 
 - Vercel runs control plane only (auth, metadata, reports)
-- workers execute MCP/hardware tasks where benchmark-pack toolchains and required device/API access exist
+- workers execute MCP/API tasks where benchmark-pack credentials and toolchains exist
 - workers call Vercel API with signed run tokens
 
 ---
@@ -88,8 +87,8 @@ This keeps AI in a copilot role and preserves human verification gates.
 - Tool call validity
 - Tool argument correctness
 - Output schema validity
-- Compile success/failure handling
-- Constraint satisfaction (pins, voltage range, required parts)
+- Build/run/test success/failure handling
+- Constraint satisfaction (API contracts, required params, expected state transitions)
 - Recovery after induced tool/runtime error
 
 ## B. Epistemic dimensions
@@ -98,7 +97,7 @@ This keeps AI in a copilot role and preserves human verification gates.
 - **Clarification behavior**: asks for key missing constraints before finalizing
 - **Evidence tracking**: cites tool outputs rather than fabricating readings
 - **Conflict handling**: detects contradictory constraints and resolves/defer
-- **Safety posture**: flags high-risk operations or ambiguous wiring
+- **Safety posture**: flags high-risk operations, destructive actions, or missing approval gates
 
 ## Suggested weights (MVP)
 
@@ -149,14 +148,14 @@ For educational use, optionally invert to 50/50 to emphasize reasoning quality.
 **Exit criteria**
 - historical run browser with filter and diff
 
-## Phase 4 — Worker + hardware lane (2–3 weeks)
+## Phase 4 — Worker hardening (2–3 weeks)
 
 - deploy worker agent for trusted local benches
 - signed job dispatch and callback
-- optional serial capture + artifact upload
+- optional detailed artifact capture + upload
 
 **Exit criteria**
-- can execute hardware-required scenarios from control plane job queue
+- can execute long-running MCP/API scenarios from control plane job queue
 
 ---
 
@@ -183,8 +182,8 @@ Use semantic versioning in schema (`schemaVersion`) to avoid breaking historical
 - **Non-determinism from LLMs**
   - mitigate with fixed seeds/temperature where possible + multiple trials
 
-- **Hardware flakiness**
-  - isolate hardware lane and use tagged benchmarks (`sim`, `compile-only`, `hardware`)
+- **Execution-environment drift**
+  - use tagged benchmarks (`api`, `compile-only`) and stable worker images/tooling
 
 - **Security exposure**
   - require trusted worker hosts, signed run tokens, scoped credentials

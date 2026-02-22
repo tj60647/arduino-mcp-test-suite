@@ -50,7 +50,7 @@ export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancell
 
 export interface JobConfig {
   suiteName: string;
-  benchmarkPack: 'arduino' | 'general';
+  benchmarkPack: 'general';
   serverName: string;
   modelName: string;
   casesPath?: string;

@@ -9,7 +9,7 @@ export interface RunRepository {
   importPayload(payload: unknown): Promise<StoredRun[]>;
 }
 
-const STORAGE_KEY = 'arduino-mcp-eval-runs-v1';
+const STORAGE_KEY = 'mcp-agent-eval-runs-v1';
 
 function sortRuns(items: StoredRun[]): StoredRun[] {
   return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));

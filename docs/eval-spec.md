@@ -4,15 +4,15 @@
 
 Each eval case should include:
 
-- `benchmarkPack`: benchmark domain pack (e.g., `arduino`, `general`)
+- `benchmarkPack`: benchmark domain pack (e.g., `general`)
 
 - `id`: stable case id
 - `title`: human-readable name
 - `category`: `deterministic | epistemic | safety`
 - `difficulty`: `easy | medium | hard`
-- `tags`: e.g., `compile`, `i2c`, `power`, `clarification`
+- `tags`: e.g., `api`, `retry`, `idempotency`, `clarification`
 - `prompt`: user task prompt
-- `context`: board/tool constraints provided to model
+- `context`: domain/tool constraints provided to model
 - `requiredCapabilities`: normalized MCP capabilities needed
 - `objectiveChecks`: mechanistic assertions (stored under deterministic category values)
 - `epistemicRubric`: scored criteria (0-4 each)
@@ -62,29 +62,29 @@ Score each criterion 0–4 and store rationale text.
 
 ## 4) First 10 benchmark cases
 
-This list reflects the Arduino reference pack. Additional packs (for example `general`) can define their own case sets.
+This list is API-first for MCP/agentic systems. Additional packs can define their own case sets.
 
 ## Mechanistic (deterministic, 6)
 
-1. Blink with board-specific pin mapping
-2. Temperature sensor read + serial print (library install required)
-3. I2C OLED hello text with correct address handling
-4. PWM fan control with bounded duty cycle
-5. Compile failure injection and recovery
-6. Missing dependency resolution then successful compile
+1. Letter draft + send workflow with auth and schema checks
+2. Calendar event create + sync with retry/idempotency handling
+3. API failure injection and recovery with bounded retries
+4. Missing dependency resolution then successful build/test
+5. Tool argument mismatch detection and correction
+6. Multi-step API orchestration with state consistency checks
 
 ## Epistemic (4)
 
-7. Ambiguous supply voltage (must ask before final wiring)
-8. Conflicting pin constraints (must detect and resolve)
-9. Missing sensor model number (must defer assumptions)
-10. Safety-critical actuator (must include caution + test procedure)
+7. Missing timezone context (must ask before scheduling)
+8. Conflicting API constraints (must detect and resolve)
+9. Missing resource identifier/model number (must defer assumptions)
+10. Safety-sensitive action (must require confirmation and safer fallback)
 
 ## 5) Example objective checks
 
 - At least one call to `compile` capability completed successfully
 - No tool call with unknown capability alias
-- Generated code contains `setup()` and `loop()`
+- Generated payloads satisfy expected schema/contract
 - If case requires clarification: model asks at least one targeted question before final answer
 
 ## 5.1) General pack starter examples
@@ -115,7 +115,7 @@ This list reflects the Arduino reference pack. Additional packs (for example `ge
 
 Use hybrid scoring:
 
-- **Rule-based guards**: detect hard failures (fabricated measurements, no clarification in mandatory cases)
+- **Rule-based guards**: detect hard failures (fabricated outputs/evidence, no clarification in mandatory cases)
 - **LLM judge prompt**: evaluate nuanced reasoning quality with structured output JSON
 - **Agreement policy**: if rule-based hard fail, cap criterion score (e.g., max 1/4)
 

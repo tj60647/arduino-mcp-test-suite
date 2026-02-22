@@ -21,8 +21,8 @@ export const createJobSchema = z.object({
   team: z.string().min(1).default('default'),
   submittedBy: z.string().min(1).default('unknown'),
   config: z.object({
-    suiteName: z.string().min(1).default('pilot'),
-    benchmarkPack: z.enum(['arduino', 'general']).default('arduino'),
+    suiteName: z.string().min(1).default('general'),
+    benchmarkPack: z.literal('general').default('general'),
     serverName: z.string().min(1),
     modelName: z.string().min(1),
     casesPath: z.string().min(1).optional(),

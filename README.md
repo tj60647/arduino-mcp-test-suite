@@ -6,11 +6,11 @@ A test suite for evaluating MCP-enabled agent systems with mechanistic and epist
 
 This project evaluates two classes of behavior:
 
-1. **Mechanistic performance**: Can the model + MCP server complete tasks correctly (tool calls, dependency recovery, compile/build/execute flow)?
+1. **Mechanistic performance**: Can the model + MCP server/API complete tasks correctly (tool calls, dependency recovery, retries, schema-valid outputs)?
 2. **Epistemic quality**: Does the model reason safely under uncertainty (ask clarifying questions, track constraints, avoid fabrication, defer when needed)?
 
-The repository currently ships with an **Arduino benchmark pack** as the first reference implementation.
-It now also includes a **general benchmark pack** with API-oriented scenarios (for example letter-writing and calendar apps).
+The primary benchmark target is **MCP + API workflows**.
+The repository includes a **general benchmark pack** with API-oriented scenarios (for example letter-writing and calendar apps).
 
 ## Why this exists
 
@@ -34,9 +34,7 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 ## Hosting model (Vercel)
 
 - **Vercel-hosted control plane**: UI, API, report storage, auth, scheduling metadata
-- **Worker execution plane**: local/bench runners execute hardware/toolchain-dependent evals and push results back
-
-> Note: direct hardware flashing and local toolchain operations should run on trusted workers, not serverless functions.
+- **Worker execution plane**: runners execute MCP/API jobs and push results back
 
 ## Suggested stack
 
@@ -65,11 +63,7 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 
 	`npm run build`
 
-3. Run the pilot suite in dry-run mode:
-
-	`npm run run-suite:dry`
-
-4. Run the general API pack (letter + calendar examples):
+3. Run the general API suite in dry-run mode:
 
 	`npm run run-suite:dry -- --pack general`
 
@@ -136,8 +130,8 @@ curl -X POST http://localhost:3000/api/jobs \
 		"team": "prototyping-lab",
 		"submittedBy": "alice",
 		"config": {
-			"suiteName": "pilot",
-			"benchmarkPack": "arduino",
+			"suiteName": "general",
+			"benchmarkPack": "general",
 			"serverName": "mcp-local",
 			"modelName": "claude-sonnet",
 			"dryRun": true,
@@ -154,8 +148,8 @@ Completed jobs automatically persist their report to the runs store (`/api/runs`
 
 ## Current CLI options
 
-- `--suite` suite name (default `pilot`)
-- `--pack` benchmark pack id (default `arduino`)
+- `--suite` suite name (default `general`)
+- `--pack` benchmark pack id (default `general`)
 - `--server` MCP server id label
 - `--model` model label for report metadata
 - `--cases` path to case JSON files (defaults to selected pack path)

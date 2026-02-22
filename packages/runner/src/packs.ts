@@ -6,13 +6,6 @@ export interface BenchmarkPackConfig {
   capabilityAliases: Record<string, Capability>;
 }
 
-const arduinoAliases: Record<string, Capability> = {
-  build: 'compile',
-  run: 'upload',
-  test: 'simulate',
-  device_io: 'serial_read'
-};
-
 const generalAliases: Record<string, Capability> = {
   compile: 'build',
   upload: 'run',
@@ -22,11 +15,6 @@ const generalAliases: Record<string, Capability> = {
 };
 
 export const BENCHMARK_PACKS: Record<BenchmarkPack, BenchmarkPackConfig> = {
-  arduino: {
-    id: 'arduino',
-    defaultCasesPath: 'cases/pilot',
-    capabilityAliases: arduinoAliases
-  },
   general: {
     id: 'general',
     defaultCasesPath: 'cases/general',

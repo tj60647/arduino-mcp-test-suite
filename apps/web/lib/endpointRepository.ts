@@ -1,6 +1,6 @@
 import type { McpEndpoint } from './types';
 
-const STORAGE_KEY = 'arduino-mcp-endpoints-v1';
+const STORAGE_KEY = 'mcp-eval-endpoints-v1';
 
 function sortEndpoints(items: McpEndpoint[]): McpEndpoint[] {
   return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));

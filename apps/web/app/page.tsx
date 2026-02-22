@@ -55,12 +55,11 @@ export default function HomePage() {
   const [jobs, setJobs] = useState<EvalJob[]>([]);
   const [isJobBusy, setIsJobBusy] = useState(false);
   const [jobEndpointId, setJobEndpointId] = useState('');
-  const [jobServerName, setJobServerName] = useState('mcp-local');
+  const [jobServerName, setJobServerName] = useState('mcp-api-server');
   const [jobTransport, setJobTransport] = useState<McpEndpoint['transport']>('sse');
   const [jobUrlOrCommand, setJobUrlOrCommand] = useState('');
   const [jobModelName, setJobModelName] = useState('claude-sonnet');
-  const [jobSuiteName, setJobSuiteName] = useState('pilot');
-  const [jobBenchmarkPack, setJobBenchmarkPack] = useState<'arduino' | 'general'>('arduino');
+  const [jobSuiteName, setJobSuiteName] = useState('general');
   const [jobTeam, setJobTeam] = useState('default');
   const [jobSubmittedBy, setJobSubmittedBy] = useState('local-user');
   const [jobDryRun, setJobDryRun] = useState(true);
@@ -251,7 +250,7 @@ export default function HomePage() {
         submittedBy: string;
         config: {
           suiteName: string;
-          benchmarkPack: 'arduino' | 'general';
+          benchmarkPack: 'general';
           serverName: string;
           modelName: string;
           dryRun: boolean;
@@ -264,8 +263,8 @@ export default function HomePage() {
         team: jobTeam.trim() || 'default',
         submittedBy: jobSubmittedBy.trim() || 'local-user',
         config: {
-          suiteName: jobSuiteName.trim() || 'pilot',
-          benchmarkPack: jobBenchmarkPack,
+          suiteName: jobSuiteName.trim() || 'general',
+          benchmarkPack: 'general',
           serverName: jobServerName.trim(),
           modelName: jobModelName.trim() || 'claude-sonnet',
           dryRun: jobDryRun,
@@ -318,7 +317,7 @@ export default function HomePage() {
 
   function handleCopyCommand(): void {
     void navigator.clipboard
-      .writeText('npm run run-suite:dry -- --team my-team --submitted-by me')
+      .writeText('npm run run-suite:dry -- --pack general --team my-team --submitted-by me')
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -534,7 +533,7 @@ export default function HomePage() {
         </p>
         <div className="cli-block">
           <span className="cli-prompt">$</span>
-          {' npm run run-suite:dry -- --team my-team --submitted-by me'}
+          {' npm run run-suite:dry -- --pack general --team my-team --submitted-by me'}
           <button type="button" className="cli-copy" onClick={handleCopyCommand}>
             {copied ? 'Copied!' : 'Copy'}
           </button>
@@ -621,15 +620,7 @@ export default function HomePage() {
           <div className="form-row">
             <div className="form-field">
               <label htmlFor="job-pack">Benchmark pack</label>
-              <select
-                id="job-pack"
-                value={jobBenchmarkPack}
-                onChange={(e) => setJobBenchmarkPack(e.target.value as 'arduino' | 'general')}
-                disabled={isBusy || isJobBusy}
-              >
-                <option value="arduino">arduino</option>
-                <option value="general">general</option>
-              </select>
+              <input id="job-pack" type="text" value="general" disabled />
             </div>
             <div className="form-field">
               <label htmlFor="job-suite">Suite name</label>

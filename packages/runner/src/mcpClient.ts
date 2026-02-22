@@ -34,8 +34,6 @@ const TOOL_TO_CAPABILITY: Record<string, Capability> = {
   run_tests: 'test',
   read_device: 'device_io',
   write_device: 'device_io',
-  arduino_compile: 'compile',
-  arduino_upload: 'upload',
   flash: 'upload',
   install_library: 'dependency_install',
   install_dependencies: 'dependency_install',

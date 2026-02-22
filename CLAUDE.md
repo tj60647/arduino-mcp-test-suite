@@ -8,10 +8,10 @@ Read it in full before making changes.
 ## Project purpose
 
 This is a **test harness for evaluating MCP-enabled agent systems**.
-It measures two classes of behavior when an AI model interacts with MCP servers across benchmark packs (including Arduino and general API scenarios):
+It measures two classes of behavior when an AI model interacts with MCP servers across benchmark packs (with a primary focus on general API scenarios):
 
 - **Task performance** (mechanistic / deterministic): did the model call the right tools, compile successfully, install dependencies, recover from errors?
-- **Epistemic quality** (subjective): did the model reason safely — ask clarifying questions when specs were ambiguous, avoid fabricating sensor readings, flag hardware hazards?
+- **Epistemic quality** (subjective): did the model reason safely — ask clarifying questions when specs were ambiguous, avoid fabricating outputs, and respect constraints?
 
 The intended users are educators, researchers, and prototyping teams who want a repeatable, model-agnostic benchmark for comparing MCP server + model combinations.
 
@@ -27,7 +27,7 @@ packages/
   runner/       Core evaluation engine (loads cases, scores, emits reports)
   schemas/      Zod schemas — single source of truth for all data types
 cases/
-  pilot/        Arduino reference cases
+  pilot/        Legacy pilot cases
   general/      General API-oriented cases
 docs/
   roadmap.md    Phase-by-phase development plan
@@ -82,7 +82,7 @@ npm run web:build
 | Trace collection | Runner | No structured turn-by-turn trace is captured during execution |
 | MCP adapter layer | `packages/mcp-adapters` (not created) | Normalises tool names across different MCP server dialects |
 | Database persistence | `apps/web/lib/runRepository.ts` | `DatabaseRunRepository` is a stub — currently localStorage only |
-| Worker execution plane | `apps/worker` (not created) | Needed for hardware flashing and serial capture |
+| Worker execution plane | `apps/worker` (not created) | Needed for long-running MCP/API execution and artifact capture |
 | Test infrastructure | — | No vitest/jest setup anywhere in the repo |
 | 5 remaining benchmark cases | `cases/` | Spec calls for 10; only 5 pilot cases exist |
 
@@ -193,7 +193,7 @@ The web app (`apps/web`) is a Next.js 15 App Router project.
 
 - **Control plane**: Vercel (Next.js API routes + UI). `apps/web` has `output: 'standalone'` in `next.config.ts`.
 - **Execution workers**: local trusted machines with toolchain/API access needed for the active benchmark pack. Workers run the CLI, then POST results to the Vercel ingest endpoint.
-- Hardware flashing and serial capture must never run on serverless functions — always on worker nodes.
+- Long-running execution and toolchain operations must run on worker nodes, not on serverless functions.
 
 ---
 

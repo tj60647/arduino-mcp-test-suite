@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const runReportSchema = z.object({
   runId: z.string().min(1),
   suiteName: z.string().min(1),
-  benchmarkPack: z.string().min(1).default('arduino'),
+  benchmarkPack: z.string().min(1).default('general'),
   server: z.string().min(1),
   model: z.string().min(1),
   startedAt: z.string().min(1),
