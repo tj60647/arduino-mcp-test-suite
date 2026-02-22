@@ -109,6 +109,7 @@ export default function HomePage() {
   const [jobSubmittedBy, setJobSubmittedBy] = useState('local-user');
   const [jobDryRun, setJobDryRun] = useState(true);
   const [showAdvancedJobOptions, setShowAdvancedJobOptions] = useState(false);
+  const [showWorkerSetup, setShowWorkerSetup] = useState(false);
 
   const totals = useMemo(() => {
     const count = runs.length;
@@ -118,6 +119,10 @@ export default function HomePage() {
         : runs.reduce((acc, item) => acc + item.report.summary.score, 0) / count;
     return { count, avgScore };
   }, [runs]);
+
+  const onlineWorkerCount = useMemo(() => {
+    return workers.filter((worker) => isWorkerOnline(worker.lastSeenAt)).length;
+  }, [workers]);
 
   useEffect(() => {
     void refreshRuns();
@@ -684,17 +689,16 @@ export default function HomePage() {
         </div>
         <div className="workflow-step">
           <div className="step-number">2</div>
-          <h3>Verify worker capacity</h3>
+          <h3>Queue a test</h3>
           <p>
-            Check that at least one worker is online and ready before queuing evaluations.
+              Pick your endpoint and queue a quick MCP test from the web UI.
           </p>
         </div>
         <div className="workflow-step">
           <div className="step-number">3</div>
-          <h3>Queue a remote run</h3>
+          <h3>Optional: manage workers</h3>
           <p>
-            Submit benchmark jobs directly from web. Workers execute MCP/API scenarios and push
-            progress updates automatically.
+              Use this only if you need to register, rotate, or revoke worker tokens.
           </p>
         </div>
       </div>
@@ -893,170 +897,184 @@ export default function HomePage() {
       <div className="section-card">
         <h2>
           <span className="step-number small">2</span>
-          Managed workers
+          Worker status (optional)
         </h2>
         <p className="section-desc">
-          Workers execute queued MCP/API evaluations. This panel shows current availability and
-          recent heartbeat activity.
+          Most users can ignore this section. It only helps when you manage remote worker
+          processes and tokens.
         </p>
 
-        <div className="queue-panel" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
-          <p className="cmd-label">Register approved worker</p>
-          <div className="form-row" style={{ marginTop: 10 }}>
-            <div className="form-field">
-              <label htmlFor="admin-api-key">Admin API key</label>
-              <input
-                id="admin-api-key"
-                type="password"
-                placeholder="INGEST_API_KEY"
-                value={adminApiKey}
-                onChange={(e) => setAdminApiKey(e.target.value)}
-                disabled={isBusy || isJobBusy || isWorkerAdminBusy}
-              />
-            </div>
-            <div className="form-field">
-              <label htmlFor="new-worker-id">Worker ID</label>
-              <input
-                id="new-worker-id"
-                type="text"
-                placeholder="worker-1"
-                value={newWorkerId}
-                onChange={(e) => setNewWorkerId(e.target.value)}
-                disabled={isBusy || isJobBusy || isWorkerAdminBusy}
-              />
-            </div>
-          </div>
-
-          <div className="toolbar">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => void handleRegisterWorker()}
-              disabled={isBusy || isJobBusy || isWorkerAdminBusy}
-            >
-              Register worker
-            </button>
-            <button
-              type="button"
-              onClick={() => void refreshRegisteredWorkers()}
-              disabled={isBusy || isJobBusy || isWorkerAdminBusy}
-            >
-              Load registered workers
-            </button>
-          </div>
-
-          {issuedWorkerToken ? (
-            <div className="token-block">
-              <strong>Worker token (shown once — save now):</strong>
-              <div className="code" style={{ marginTop: 6 }}>{issuedWorkerToken}</div>
-              <div className="toolbar" style={{ marginTop: 10, marginBottom: 0 }}>
-                <button
-                  type="button"
-                  onClick={() => void handleCopyWorkerToken()}
-                  disabled={isBusy || isJobBusy || isWorkerAdminBusy}
-                >
-                  {tokenCopied ? 'Copied' : 'Copy token'}
-                </button>
-              </div>
-              <p className="help-text" style={{ marginTop: 8 }}>
-                This token will not be shown again after refresh. Store it in your worker secret
-                manager before leaving this page.
-              </p>
-            </div>
-          ) : null}
-
-          <table style={{ marginTop: 14 }}>
-            <thead>
-              <tr>
-                <th>Registered worker</th>
-                <th>Created</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {registeredWorkers.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="empty-cell">
-                    No registered workers loaded.
-                  </td>
-                </tr>
-              ) : (
-                registeredWorkers.map((worker) => (
-                  <tr key={`${worker.workerId}-${worker.createdAt}`}>
-                    <td className="code">{worker.workerId}</td>
-                    <td>{new Date(worker.createdAt).toLocaleString()}</td>
-                    <td>
-                      {worker.revokedAt ? (
-                        <span className="badge-fail">revoked</span>
-                      ) : (
-                        <span className="badge-pass">active</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="toolbar" style={{ marginBottom: 0 }}>
-                        <button
-                          type="button"
-                          onClick={() => void handleRotateWorkerToken(worker.workerId)}
-                          disabled={isBusy || isJobBusy || isWorkerAdminBusy || Boolean(worker.revokedAt)}
-                        >
-                          Rotate token
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-danger"
-                          onClick={() => void handleRevokeWorkerToken(worker.workerId)}
-                          disabled={isBusy || isJobBusy || isWorkerAdminBusy || Boolean(worker.revokedAt)}
-                        >
-                          Revoke
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
         <div className="toolbar">
-          <button type="button" onClick={() => void refreshWorkers()} disabled={isBusy || isJobBusy}>
-            Refresh workers
+          <button
+            type="button"
+            onClick={() => setShowWorkerSetup((current) => !current)}
+            disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+          >
+            {showWorkerSetup ? 'Hide worker details' : 'Show worker details'}
           </button>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Worker</th>
-              <th>Status</th>
-              <th>Current job</th>
-              <th>Host</th>
-              <th>Last seen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {workers.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="empty-cell">
-                  No workers reporting yet. Start at least one worker to process queued runs.
-                </td>
-              </tr>
-            ) : (
-              workers.map((worker) => (
-                <tr key={worker.workerId}>
-                  <td className="code">{worker.workerId}</td>
-                  <td>
-                    <span className={workerStatusBadge(worker)}>{workerStatusLabel(worker)}</span>
-                  </td>
-                  <td className="code">{worker.currentJobId ?? '—'}</td>
-                  <td>{worker.host ?? '—'}</td>
-                  <td>{new Date(worker.lastSeenAt).toLocaleString()}</td>
+        <p className="help-text" style={{ marginTop: 0 }}>
+          Workers online: <strong>{onlineWorkerCount}</strong> / {workers.length}
+        </p>
+
+        {showWorkerSetup ? (
+          <>
+            <div className="toolbar">
+              <button type="button" onClick={() => void refreshWorkers()} disabled={isBusy || isJobBusy}>
+                Refresh workers
+              </button>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Worker</th>
+                  <th>Status</th>
+                  <th>Current job</th>
+                  <th>Host</th>
+                  <th>Last seen</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {workers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="empty-cell">
+                      No workers reporting yet. Start at least one worker to process queued runs.
+                    </td>
+                  </tr>
+                ) : (
+                  workers.map((worker) => (
+                    <tr key={worker.workerId}>
+                      <td className="code">{worker.workerId}</td>
+                      <td>
+                        <span className={workerStatusBadge(worker)}>{workerStatusLabel(worker)}</span>
+                      </td>
+                      <td className="code">{worker.currentJobId ?? '—'}</td>
+                      <td>{worker.host ?? '—'}</td>
+                      <td>{new Date(worker.lastSeenAt).toLocaleString()}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            <div className="queue-panel" style={{ marginTop: 14 }}>
+              <p className="cmd-label">Advanced worker setup</p>
+              <div className="form-row" style={{ marginTop: 10 }}>
+                <div className="form-field">
+                  <label htmlFor="admin-api-key">Admin API key</label>
+                  <input
+                    id="admin-api-key"
+                    type="password"
+                    placeholder="INGEST_API_KEY"
+                    value={adminApiKey}
+                    onChange={(e) => setAdminApiKey(e.target.value)}
+                    disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+                  />
+                </div>
+                <div className="form-field">
+                  <label htmlFor="new-worker-id">Worker ID</label>
+                  <input
+                    id="new-worker-id"
+                    type="text"
+                    placeholder="worker-1"
+                    value={newWorkerId}
+                    onChange={(e) => setNewWorkerId(e.target.value)}
+                    disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+                  />
+                </div>
+              </div>
+
+              <div className="toolbar">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void handleRegisterWorker()}
+                  disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+                >
+                  Register worker
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void refreshRegisteredWorkers()}
+                  disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+                >
+                  Load registered workers
+                </button>
+              </div>
+
+              {issuedWorkerToken ? (
+                <div className="token-block">
+                  <strong>Worker token (shown once — save now):</strong>
+                  <div className="code" style={{ marginTop: 6 }}>{issuedWorkerToken}</div>
+                  <div className="toolbar" style={{ marginTop: 10, marginBottom: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyWorkerToken()}
+                      disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+                    >
+                      {tokenCopied ? 'Copied' : 'Copy token'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <table style={{ marginTop: 14 }}>
+                <thead>
+                  <tr>
+                    <th>Registered worker</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registeredWorkers.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="empty-cell">
+                        No registered workers loaded.
+                      </td>
+                    </tr>
+                  ) : (
+                    registeredWorkers.map((worker) => (
+                      <tr key={`${worker.workerId}-${worker.createdAt}`}>
+                        <td className="code">{worker.workerId}</td>
+                        <td>{new Date(worker.createdAt).toLocaleString()}</td>
+                        <td>
+                          {worker.revokedAt ? (
+                            <span className="badge-fail">revoked</span>
+                          ) : (
+                            <span className="badge-pass">active</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="toolbar" style={{ marginBottom: 0 }}>
+                            <button
+                              type="button"
+                              onClick={() => void handleRotateWorkerToken(worker.workerId)}
+                              disabled={isBusy || isJobBusy || isWorkerAdminBusy || Boolean(worker.revokedAt)}
+                            >
+                              Rotate token
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger"
+                              onClick={() => void handleRevokeWorkerToken(worker.workerId)}
+                              disabled={isBusy || isJobBusy || isWorkerAdminBusy || Boolean(worker.revokedAt)}
+                            >
+                              Revoke
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
       </div>
 
       {/* ── Step 2: Queue a remote run ─────────────────────────────────── */}
@@ -1072,11 +1090,11 @@ export default function HomePage() {
 
         <div className="queue-panel">
           <p className="cmd-label" style={{ marginTop: 20 }}>
-            Quick MCP test (worker must be running):
+            Quick MCP test:
           </p>
           <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
             Pick an endpoint and click <strong>Queue quick test</strong>. Use advanced options only
-            if you need custom metadata.
+            if you need custom metadata. If no worker is online, the job stays queued until one is available.
           </p>
 
           <div className="form-row" style={{ marginTop: 10 }}>
