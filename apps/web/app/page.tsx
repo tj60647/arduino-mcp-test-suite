@@ -110,6 +110,7 @@ export default function HomePage() {
   const [jobDryRun, setJobDryRun] = useState(true);
   const [showAdvancedJobOptions, setShowAdvancedJobOptions] = useState(false);
   const [showWorkerSetup, setShowWorkerSetup] = useState(false);
+  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
 
   const totals = useMemo(() => {
     const count = runs.length;
@@ -639,7 +640,14 @@ export default function HomePage() {
 
       const created = (await response.json()) as { id: string };
       await refreshJobs();
-      setMessage(mode === 'quick' ? `Quick test queued: ${created.id}` : `Job queued: ${created.id}`);
+      if (mode === 'quick') {
+        const queuedMessage = onlineWorkerCount > 0
+          ? `Test started: ${created.id}`
+          : `Test queued: ${created.id}. No runner is online yet, so it will start when a runner connects.`;
+        setMessage(queuedMessage);
+      } else {
+        setMessage(`Job queued: ${created.id}`);
+      }
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -663,55 +671,38 @@ export default function HomePage() {
         <div className="toolbar" style={{ marginBottom: 12 }}>
           <button
             type="button"
-            onClick={() => setDenseMode((current) => !current)}
+            onClick={() => setShowAdvancedControls((current) => !current)}
             style={{ marginLeft: 'auto' }}
+          >
+            {showAdvancedControls ? 'Hide advanced controls' : 'Show advanced controls'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDenseMode((current) => !current)}
           >
             {denseMode ? 'Comfortable mode' : 'High-density mode'}
           </button>
         </div>
-        <h1>Does your MCP server handle agent tasks correctly?</h1>
+        <h1>Test your MCP in 2 steps</h1>
         <p className="hero-sub">
-          Run a standardized benchmark suite against any MCP server and get scores for mechanistic
-          execution and epistemic reasoning quality — so you can compare servers and models
-          side-by-side.
+          Paste your MCP URL, click run, and check the result table. Advanced benchmark and worker
+          controls stay hidden unless you open them.
         </p>
       </div>
 
       {/* ── How it works ──────────────────────────────────────────────── */}
-      <div className="workflow">
-        <div className="workflow-step">
-          <div className="step-number">1</div>
-          <h3>Register your MCP server</h3>
-          <p>
-            Enter connection details for the server you want to test — a URL for network servers or
-            a command for locally-launched ones.
-          </p>
-        </div>
-        <div className="workflow-step">
-          <div className="step-number">2</div>
-          <h3>Queue a test</h3>
-          <p>
-              Pick your endpoint and queue a quick MCP test from the web UI.
-          </p>
-        </div>
-        <div className="workflow-step">
-          <div className="step-number">3</div>
-          <h3>Optional: manage workers</h3>
-          <p>
-              Use this only if you need to register, rotate, or revoke worker tokens.
-          </p>
-        </div>
-      </div>
+      <p className="help-text" style={{ margin: '0 0 16px' }}>
+        1) Paste MCP URL and connect. 2) Run quick test. 3) See results below.
+      </p>
 
       {/* ── Step 1: Register server ────────────────────────────────────── */}
       <div className="section-card">
         <h2>
           <span className="step-number small">1</span>
-          Register your MCP server
+          Paste your MCP URL
         </h2>
         <p className="section-desc">
-          Add one profile per MCP server/API endpoint. Profiles are stored in your browser and
-          reused when queuing jobs.
+          This is the only required setup. Your endpoint is saved in this browser for reuse.
         </p>
 
         <div className="form-row" style={{ marginTop: 4 }}>
@@ -726,8 +717,7 @@ export default function HomePage() {
               disabled={isBusy}
             />
             <p className="help-text">
-              Paste one URL and click connect. Use advanced options only if transport or metadata
-              needs customization.
+              Paste one URL and click Connect endpoint.
             </p>
           </div>
         </div>
@@ -741,13 +731,15 @@ export default function HomePage() {
           >
             Connect endpoint
           </button>
-          <button
-            type="button"
-            onClick={() => setShowEndpointAdvanced((current) => !current)}
-            disabled={isBusy}
-          >
-            {showEndpointAdvanced ? 'Hide advanced endpoint options' : 'Show advanced endpoint options'}
-          </button>
+          {showAdvancedControls ? (
+            <button
+              type="button"
+              onClick={() => setShowEndpointAdvanced((current) => !current)}
+              disabled={isBusy}
+            >
+              {showEndpointAdvanced ? 'Hide advanced endpoint options' : 'Show advanced endpoint options'}
+            </button>
+          ) : null}
         </div>
 
         {showEndpointAdvanced ? (
@@ -894,14 +886,14 @@ export default function HomePage() {
         )}
       </div>
 
+      {showAdvancedControls ? (
       <div className="section-card">
         <h2>
           <span className="step-number small">2</span>
-          Worker status (optional)
+          Runner status (optional)
         </h2>
         <p className="section-desc">
-          Most users can ignore this section. It only helps when you manage remote worker
-          processes and tokens.
+          You can ignore this unless tests stay queued. A runner must be online to execute tests.
         </p>
 
         <div className="toolbar">
@@ -1076,16 +1068,16 @@ export default function HomePage() {
           </>
         ) : null}
       </div>
+      ) : null}
 
       {/* ── Step 2: Queue a remote run ─────────────────────────────────── */}
       <div className="section-card">
         <h2>
           <span className="step-number small">3</span>
-          Queue a remote run
+          Run test
         </h2>
         <p className="section-desc">
-          Submit a job from this form. A worker process executes the evaluation remotely and pushes
-          status updates plus final report data back to this dashboard.
+          Pick your endpoint and run a quick test.
         </p>
 
         <div className="queue-panel">
@@ -1093,9 +1085,17 @@ export default function HomePage() {
             Quick MCP test:
           </p>
           <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
-            Pick an endpoint and click <strong>Queue quick test</strong>. Use advanced options only
-            if you need custom metadata. If no worker is online, the job stays queued until one is available.
+            Pick an endpoint and click <strong>Run quick test</strong>. If no runner is online, your
+            test waits in queue until one connects.
           </p>
+
+          {onlineWorkerCount === 0 ? (
+            <p className="help-text" style={{ marginTop: 0, marginBottom: 12 }}>
+              No runner online right now. Start one with:
+              {' '}
+              <code>npm run run-worker -- --control-plane http://localhost:3000</code>
+            </p>
+          ) : null}
 
           <div className="form-row" style={{ marginTop: 10 }}>
             <div className="form-field">
@@ -1133,21 +1133,23 @@ export default function HomePage() {
               onClick={() => void handleCreateQuickJob()}
               disabled={isBusy || isJobBusy}
             >
-              Queue quick test
+              Run quick test
             </button>
-            <button
-              type="button"
-              onClick={() => setShowAdvancedJobOptions((current) => !current)}
-              disabled={isBusy || isJobBusy}
-            >
-              {showAdvancedJobOptions ? 'Hide advanced options' : 'Show advanced options'}
-            </button>
+            {showAdvancedControls ? (
+              <button
+                type="button"
+                onClick={() => setShowAdvancedJobOptions((current) => !current)}
+                disabled={isBusy || isJobBusy}
+              >
+                {showAdvancedJobOptions ? 'Hide advanced options' : 'Show advanced options'}
+              </button>
+            ) : null}
             <button type="button" onClick={() => void refreshJobs()} disabled={isBusy || isJobBusy}>
               Refresh jobs
             </button>
           </div>
 
-          {showAdvancedJobOptions ? (
+          {showAdvancedControls && showAdvancedJobOptions ? (
             <>
           <div className="form-row">
             <div className="form-field">
@@ -1302,8 +1304,7 @@ export default function HomePage() {
           Test results
         </h2>
         <p className="section-desc">
-          Completed jobs appear here automatically. You can also import a <code>run-report.json</code>
-          manually, or export all results as JSON for sharing.
+          Your completed tests appear here automatically.
         </p>
 
         <div className="toolbar">
