@@ -51,7 +51,7 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 ## Initial success criteria
 
 - Run a full 10-case suite against one MCP server in <15 minutes
-- Deterministic pass/fail for objective checks
+- Mechanistic (deterministic) pass/fail for objective checks
 - Epistemic rubric scores from structured judge prompts + rule checks
 - Produce a single JSON + HTML report artifact per run
 
@@ -81,9 +81,9 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 
 This repo now includes a web control plane at `apps/web` using browser local storage for MVP collaboration.
 
-1. Start the web app:
+2. Start the web app:
 
-	`npm run --workspace @arduino-mcp/web dev`
+	`npm run --workspace @mcp-agent-eval/web dev`
 
 2. Open dashboard:
 
@@ -146,7 +146,7 @@ Current web MVP uses browser localStorage + JSON import/export. For production m
 ```bash
 git init
 git add .
-git commit -m "Initial Arduino MCP eval suite MVP"
+git commit -m "Initial MCP agent eval suite MVP"
 git branch -M main
 git remote add origin <YOUR_GITHUB_REPO_URL>
 git push -u origin main
@@ -170,4 +170,4 @@ When prompted, choose the current repo and set project root to `apps/web`.
 
 ## Next step
 
-Implement Phase 1 from [docs/roadmap.md](docs/roadmap.md): local CLI runner + schema validation + 5 deterministic cases.
+Implement Phase 1 from [docs/roadmap.md](docs/roadmap.md): local CLI runner + schema validation + 5 mechanistic cases.

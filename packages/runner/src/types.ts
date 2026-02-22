@@ -1,4 +1,4 @@
-import type { EvalCase, RunTraceEvent } from '@arduino-mcp/schemas';
+import type { EvalCase, RunTraceEvent } from '@mcp-agent-eval/schemas';
 
 export interface CaseResult {
   id: string;

@@ -1,4 +1,4 @@
-# CLAUDE.md — Arduino MCP Eval Suite
+# CLAUDE.md — MCP Agent Eval Suite
 
 This file is the primary guide for Claude Code (and any AI assistant) working on this repository.
 Read it in full before making changes.
@@ -7,10 +7,10 @@ Read it in full before making changes.
 
 ## Project purpose
 
-This is a **test harness for evaluating Arduino-focused MCP servers**.
-It measures two classes of behavior when an AI model interacts with an MCP server through Arduino prototyping tasks:
+This is a **test harness for evaluating MCP-enabled agent systems**.
+It measures two classes of behavior when an AI model interacts with MCP servers across benchmark packs (including Arduino and general API scenarios):
 
-- **Task performance** (deterministic): did the model call the right tools, compile successfully, install dependencies, recover from errors?
+- **Task performance** (mechanistic / deterministic): did the model call the right tools, compile successfully, install dependencies, recover from errors?
 - **Epistemic quality** (subjective): did the model reason safely — ask clarifying questions when specs were ambiguous, avoid fabricating sensor readings, flag hardware hazards?
 
 The intended users are educators, researchers, and prototyping teams who want a repeatable, model-agnostic benchmark for comparing MCP server + model combinations.
@@ -27,7 +27,8 @@ packages/
   runner/       Core evaluation engine (loads cases, scores, emits reports)
   schemas/      Zod schemas — single source of truth for all data types
 cases/
-  pilot/        5 JSON test case definitions (MVP benchmark pack)
+  pilot/        Arduino reference cases
+  general/      General API-oriented cases
 docs/
   roadmap.md    Phase-by-phase development plan
   eval-spec.md  Evaluation specification (schema, rubric, case list)
@@ -90,7 +91,7 @@ npm run web:build
 ## Data contracts
 
 All types live in `packages/schemas/src/index.ts` and are generated from Zod.
-**Never hand-write TypeScript interfaces that duplicate these.** Import from `@arduino-mcp/schemas`.
+**Never hand-write TypeScript interfaces that duplicate these.** Import from `@mcp-agent-eval/schemas`.
 
 Key types:
 
@@ -102,6 +103,8 @@ RunReport     // full suite output written to reports/ and POSTed to ingest API
 ```
 
 Schema version is pinned at `'0.1.0'` (literal type). When the schema changes in a breaking way, bump this version and update all case JSON files.
+
+Compatibility note: the user-facing framing uses **mechanistic + epistemic**, while schema/report fields still use `deterministic*` names for backward compatibility.
 
 ---
 
@@ -115,7 +118,7 @@ Schema version is pinned at `'0.1.0'` (literal type). When the schema changes in
 6. The runner will pick up the new file automatically — no registration needed.
 
 The 10-case target from the eval spec:
-- **Deterministic (6):** blink (done), temp sensor (done), compile recovery (done), I2C OLED text, PWM fan control, missing-dependency resolution.
+- **Mechanistic (deterministic, 6):** blink (done), temp sensor (done), compile recovery (done), I2C OLED text, PWM fan control, missing-dependency resolution.
 - **Epistemic (4):** ambiguous voltage (done), conflicting pins (done), missing sensor model number, safety-critical actuator.
 
 ---
@@ -166,12 +169,12 @@ A `packages/scoring` package should be created for this logic.
 
 | Dimension | Default weight |
 |---|---|
-| Deterministic | 70% (`deterministicWeight: 0.7`) |
+| Mechanistic | 70% (`deterministicWeight: 0.7`) |
 | Epistemic | 30% |
 
-Configurable via `RunConfig.deterministicWeight`. For educational use, 50/50 is suggested in the roadmap.
+Configurable via `RunConfig.deterministicWeight` (compat field name). For educational use, 50/50 is suggested in the roadmap.
 
-Pass thresholds: `deterministicScore >= 0.8 AND epistemicScore >= 0.6`.
+Pass thresholds: `deterministicScore >= 0.8 AND epistemicScore >= 0.6` (where `deterministicScore` is the mechanistic score field).
 
 ---
 
@@ -189,14 +192,14 @@ The web app (`apps/web`) is a Next.js 15 App Router project.
 ## Deployment model
 
 - **Control plane**: Vercel (Next.js API routes + UI). `apps/web` has `output: 'standalone'` in `next.config.ts`.
-- **Execution workers**: local trusted machines with Arduino toolchain access. Workers run the CLI, then POST results to the Vercel ingest endpoint.
+- **Execution workers**: local trusted machines with toolchain/API access needed for the active benchmark pack. Workers run the CLI, then POST results to the Vercel ingest endpoint.
 - Hardware flashing and serial capture must never run on serverless functions — always on worker nodes.
 
 ---
 
 ## Conventions
 
-- **Imports**: use the `@arduino-mcp/schemas` and `@arduino-mcp/runner` workspace package names, not relative paths across packages.
+- **Imports**: use the `@mcp-agent-eval/schemas` and `@mcp-agent-eval/runner` workspace package names, not relative paths across packages.
 - **File extensions**: TypeScript source uses `.ts`; compiled output uses `.js` (NodeNext module resolution — import paths in source must use `.js` extensions).
 - **No `any`**: strict TypeScript throughout. Use Zod inference for types rather than hand-writing interfaces.
 - **Schemas as source of truth**: add new fields to Zod schemas first, then propagate to case JSON files and runner logic.
@@ -207,7 +210,7 @@ The web app (`apps/web`) is a Next.js 15 App Router project.
 
 ## Suggested next steps (priority order)
 
-1. **Install `@modelcontextprotocol/sdk`** and implement live MCP transport in `mcpClient.ts`. Start with `stdio` transport against a local Arduino MCP server.
+1. **Install `@modelcontextprotocol/sdk`** and implement live MCP transport in `mcpClient.ts`. Start with `stdio` transport against a local MCP server.
 2. **Build the turn loop** in the runner: prompt → model → tool calls → MCP → results → repeat.
 3. **Add `RunTraceEvent` type** to `packages/schemas` and emit trace events during the turn loop.
 4. **Create `packages/scoring`** with rule-based guards and an LLM judge prompt for epistemic scoring.

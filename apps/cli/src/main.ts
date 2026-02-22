@@ -2,8 +2,8 @@
 import { mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { Command } from 'commander';
-import { getBenchmarkPackConfig, runSuite, writeReport } from '@arduino-mcp/runner';
-import type { BenchmarkPack, McpTransportConfig } from '@arduino-mcp/schemas';
+import { getBenchmarkPackConfig, runSuite, writeReport } from '@mcp-agent-eval/runner';
+import type { BenchmarkPack, McpTransportConfig } from '@mcp-agent-eval/schemas';
 
 async function ingestReport(input: {
   ingestUrl: string;
@@ -46,7 +46,7 @@ function buildTransportConfig(options: {
     if (!options.mcpCommand) {
       throw new Error(
         'stdio transport requires --mcp-command <cmd>. ' +
-          'Example: --mcp-command arduino-mcp-server'
+          'Example: --mcp-command mcp-server'
       );
     }
     const args = options.mcpArgs ? options.mcpArgs.split(' ') : [];
@@ -72,7 +72,7 @@ program
   .description('Run MCP agent evaluation suite')
   .option('--suite <name>', 'suite name', 'pilot')
   .option('--pack <name>', 'benchmark pack id (e.g., arduino, general)', 'arduino')
-  .option('--server <name>', 'MCP server identifier', 'arduino-mcp-local')
+  .option('--server <name>', 'MCP server identifier', 'mcp-local')
   .option('--model <name>', 'model identifier', 'chatgpt-or-claude')
   .option('--cases <path>', 'path to eval cases (defaults to selected pack path)')
   .option('--out <path>', 'output report path', 'reports/run-report.json')
@@ -140,7 +140,7 @@ program
       { metric: 'passed', value: report.summary.passed },
       { metric: 'failed', value: report.summary.failed },
       { metric: 'score', value: report.summary.score.toFixed(3) },
-      { metric: 'deterministic', value: report.summary.deterministicScore.toFixed(3) },
+      { metric: 'mechanistic', value: report.summary.deterministicScore.toFixed(3) },
       { metric: 'epistemic', value: report.summary.epistemicScore.toFixed(3) }
     ]);
 

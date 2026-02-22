@@ -6,7 +6,7 @@ import {
   type EvalCase,
   type RunConfig,
   type RunTraceEvent
-} from '@arduino-mcp/schemas';
+} from '@mcp-agent-eval/schemas';
 import { connectMcp } from './mcpClient.js';
 import type { CaseResult, RunReport } from './types.js';
 import { getBenchmarkPackConfig } from './packs.js';

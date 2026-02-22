@@ -2,7 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { Capability, McpTransportConfig } from '@arduino-mcp/schemas';
+import type { Capability, McpTransportConfig } from '@mcp-agent-eval/schemas';
 
 // Maps MCP server tool names → normalised Capability enum values.
 // Covers both canonical names and common dialect variants.

@@ -96,7 +96,7 @@ export default function HomePage() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `arduino-mcp-runs-${new Date().toISOString().slice(0, 19)}.json`;
+      anchor.download = `mcp-agent-eval-runs-${new Date().toISOString().slice(0, 19)}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
       setMessage('JSON export downloaded.');
@@ -132,7 +132,7 @@ export default function HomePage() {
 
   return (
     <main>
-      <h1>Arduino MCP Eval Runs</h1>
+      <h1>MCP Agent Eval Runs</h1>
       <p>Local mode stores runs in browser localStorage with JSON import/export for sharing.</p>
 
       <h2>MCP Endpoints</h2>

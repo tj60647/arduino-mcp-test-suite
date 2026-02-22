@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Arduino MCP Eval Suite',
-  description: 'Collaborative run dashboard for Arduino MCP evaluations'
+  title: 'MCP Agent Eval Suite',
+  description: 'Collaborative run dashboard for mechanistic and epistemic MCP agent evaluations'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

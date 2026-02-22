@@ -1,5 +1,5 @@
 {
-  "name": "@arduino-mcp/runner",
+  "name": "@mcp-agent-eval/runner",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -10,7 +10,7 @@
     "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
-    "@arduino-mcp/schemas": "0.1.0",
+    "@mcp-agent-eval/schemas": "0.1.0",
     "@modelcontextprotocol/sdk": "^1.26.0"
   }
 }

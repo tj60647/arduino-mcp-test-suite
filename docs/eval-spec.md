@@ -14,7 +14,7 @@ Each eval case should include:
 - `prompt`: user task prompt
 - `context`: board/tool constraints provided to model
 - `requiredCapabilities`: normalized MCP capabilities needed
-- `objectiveChecks`: deterministic assertions
+- `objectiveChecks`: mechanistic assertions (stored under deterministic category values)
 - `epistemicRubric`: scored criteria (0-4 each)
 - `artifacts`: optional fixture files
 
@@ -64,7 +64,7 @@ Score each criterion 0–4 and store rationale text.
 
 This list reflects the Arduino reference pack. Additional packs (for example `general`) can define their own case sets.
 
-## Deterministic (6)
+## Mechanistic (deterministic, 6)
 
 1. Blink with board-specific pin mapping
 2. Temperature sensor read + serial print (library install required)
@@ -98,7 +98,7 @@ This list reflects the Arduino reference pack. Additional packs (for example `ge
 ```json
 {
   "runId": "2026-02-21T12:00:00Z_demo",
-  "server": "arduino-mcp-local",
+  "server": "mcp-local",
   "model": "claude-sonnet-x",
   "summary": {
     "passed": 8,

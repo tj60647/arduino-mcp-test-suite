@@ -1,5 +1,5 @@
 {
-  "name": "@arduino-mcp/schemas",
+  "name": "@mcp-agent-eval/schemas",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",

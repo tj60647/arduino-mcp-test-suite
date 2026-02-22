@@ -1,6 +1,7 @@
 {
-  "name": "@arduino-mcp/cli",
+  "name": "@mcp-agent-eval/cli",
   "version": "0.1.0",
+  "description": "CLI runner for mechanistic and epistemic MCP agent evaluations",
   "type": "module",
   "bin": {
     "run-suite": "dist/main.js"
@@ -12,7 +13,7 @@
     "run-suite": "node dist/main.js"
   },
   "dependencies": {
-    "@arduino-mcp/runner": "0.1.0",
+    "@mcp-agent-eval/runner": "0.1.0",
     "commander": "^13.1.0"
   }
 }

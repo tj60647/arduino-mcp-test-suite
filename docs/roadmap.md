@@ -57,7 +57,7 @@ This keeps AI in a copilot role and preserves human verification gates.
   - declares capability map (`compile`, `upload`, `read_serial`, etc.)
 
 - **Scoring Engine (`packages/scoring`)**
-  - objective checks (deterministic)
+  - objective checks (mechanistic/deterministic)
   - epistemic rubric checks (LLM judge + heuristic guards)
   - weighted aggregate score
 
@@ -76,14 +76,14 @@ This keeps AI in a copilot role and preserves human verification gates.
 ## Execution model for Vercel
 
 - Vercel runs control plane only (auth, metadata, reports)
-- workers execute MCP/hardware tasks where Arduino CLI + USB access exist
+- workers execute MCP/hardware tasks where benchmark-pack toolchains and required device/API access exist
 - workers call Vercel API with signed run tokens
 
 ---
 
 ## 4) Evaluation model
 
-## A. Deterministic dimensions
+## A. Mechanistic (deterministic) dimensions
 
 - Tool call validity
 - Tool argument correctness
@@ -102,7 +102,7 @@ This keeps AI in a copilot role and preserves human verification gates.
 
 ## Suggested weights (MVP)
 
-- Deterministic: 70%
+- Mechanistic (stored as `deterministicWeight`): 70%
 - Epistemic: 30%
 
 For educational use, optionally invert to 50/50 to emphasize reasoning quality.
@@ -125,7 +125,7 @@ For educational use, optionally invert to 50/50 to emphasize reasoning quality.
 
 - scenario runner with retries/timeouts
 - objective checker module
-- 5 deterministic cases
+- 5 mechanistic cases
 - JSON report output + CLI summary table
 
 **Exit criteria**
@@ -224,6 +224,6 @@ Use semantic versioning in schema (`schemaVersion`) to avoid breaking historical
 
 1. Create schema package with Zod definitions and JSON schema generation.
 2. Implement minimal runner loop (`load case -> connect MCP -> execute -> trace`).
-3. Add 3 deterministic and 2 epistemic pilot cases.
+3. Add 3 mechanistic and 2 epistemic pilot cases.
 4. Emit `run-report.json` with aggregate and per-dimension scores.
 5. Add GitHub Actions to run compile-only benchmark on PR.

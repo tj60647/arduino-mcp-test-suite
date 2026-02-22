@@ -1,4 +1,4 @@
-import type { BenchmarkPack, Capability } from '@arduino-mcp/schemas';
+import type { BenchmarkPack, Capability } from '@mcp-agent-eval/schemas';
 
 export interface BenchmarkPackConfig {
   id: BenchmarkPack;
