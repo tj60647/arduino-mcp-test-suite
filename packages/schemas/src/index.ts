@@ -50,17 +50,90 @@ export const evalCaseSchema = z.object({
   epistemicRubric: z.array(epistemicCriterionSchema).optional()
 });
 
+// ─── MCP transport configuration ─────────────────────────────────────────────
+
+export const mcpTransportConfigSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('stdio'),
+    command: z.string().min(1),
+    args: z.array(z.string()).default([])
+  }),
+  z.object({
+    type: z.literal('sse'),
+    url: z.string().url()
+  }),
+  z.object({
+    type: z.literal('streamable-http'),
+    url: z.string().url()
+  })
+]);
+
 export const runConfigSchema = z.object({
   suiteName: z.string().default('pilot'),
   serverName: z.string().min(1),
   modelName: z.string().min(1),
   casesPath: z.string().min(1),
   dryRun: z.boolean().default(false),
-  deterministicWeight: z.number().min(0).max(1).default(0.7)
+  deterministicWeight: z.number().min(0).max(1).default(0.7),
+  mcpTransportConfig: mcpTransportConfigSchema.optional()
 });
+
+// ─── Run trace events ─────────────────────────────────────────────────────────
+
+export const runTraceEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('session_connected'),
+    timestamp: z.string().datetime(),
+    serverName: z.string(),
+    capabilities: z.array(capabilitySchema)
+  }),
+  z.object({
+    type: z.literal('turn_start'),
+    timestamp: z.string().datetime(),
+    turn: z.number().int().min(0),
+    prompt: z.string()
+  }),
+  z.object({
+    type: z.literal('tool_call'),
+    timestamp: z.string().datetime(),
+    turn: z.number().int().min(0),
+    toolName: z.string(),
+    parameters: z.record(z.unknown())
+  }),
+  z.object({
+    type: z.literal('tool_result'),
+    timestamp: z.string().datetime(),
+    turn: z.number().int().min(0),
+    toolName: z.string(),
+    result: z.unknown(),
+    errorMessage: z.string().optional()
+  }),
+  z.object({
+    type: z.literal('model_response'),
+    timestamp: z.string().datetime(),
+    turn: z.number().int().min(0),
+    content: z.string(),
+    finishReason: z.enum(['stop', 'tool_use', 'max_turns', 'error'])
+  }),
+  z.object({
+    type: z.literal('check_result'),
+    timestamp: z.string().datetime(),
+    checkId: z.string(),
+    passed: z.boolean(),
+    score: z.number(),
+    note: z.string().optional()
+  }),
+  z.object({
+    type: z.literal('session_closed'),
+    timestamp: z.string().datetime(),
+    totalTurns: z.number().int().min(0)
+  })
+]);
 
 export type Capability = z.infer<typeof capabilitySchema>;
 export type ObjectiveCheck = z.infer<typeof objectiveCheckSchema>;
 export type EpistemicCriterion = z.infer<typeof epistemicCriterionSchema>;
 export type EvalCase = z.infer<typeof evalCaseSchema>;
+export type McpTransportConfig = z.infer<typeof mcpTransportConfigSchema>;
 export type RunConfig = z.infer<typeof runConfigSchema>;
+export type RunTraceEvent = z.infer<typeof runTraceEventSchema>;

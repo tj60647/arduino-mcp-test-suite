@@ -1,4 +1,4 @@
-import type { EvalCase } from '@arduino-mcp/schemas';
+import type { EvalCase, RunTraceEvent } from '@arduino-mcp/schemas';
 
 export interface CaseResult {
   id: string;
@@ -8,6 +8,7 @@ export interface CaseResult {
   deterministicScore: number;
   epistemicScore: number;
   notes: string[];
+  trace: RunTraceEvent[];
 }
 
 export interface RunSummary {

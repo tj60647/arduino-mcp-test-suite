@@ -10,6 +10,7 @@
     "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
-    "@arduino-mcp/schemas": "0.1.0"
+    "@arduino-mcp/schemas": "0.1.0",
+    "@modelcontextprotocol/sdk": "^1.26.0"
   }
 }
