@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { Command } from 'commander';
 import { runSuite, writeReport } from '@arduino-mcp/runner';
+import type { McpTransportConfig } from '@arduino-mcp/schemas';
 
 async function ingestReport(input: {
   ingestUrl: string;
@@ -30,6 +31,40 @@ async function ingestReport(input: {
   }
 }
 
+function buildTransportConfig(options: {
+  transport?: string;
+  mcpCommand?: string;
+  mcpArgs?: string;
+  mcpUrl?: string;
+  dryRun?: boolean;
+}): McpTransportConfig | undefined {
+  if (options.dryRun) return undefined;
+
+  const transportType = options.transport ?? 'stdio';
+
+  if (transportType === 'stdio') {
+    if (!options.mcpCommand) {
+      throw new Error(
+        'stdio transport requires --mcp-command <cmd>. ' +
+          'Example: --mcp-command arduino-mcp-server'
+      );
+    }
+    const args = options.mcpArgs ? options.mcpArgs.split(' ') : [];
+    return { type: 'stdio', command: options.mcpCommand, args };
+  }
+
+  if (transportType === 'sse' || transportType === 'streamable-http') {
+    if (!options.mcpUrl) {
+      throw new Error(`${transportType} transport requires --mcp-url <url>.`);
+    }
+    return { type: transportType as 'sse' | 'streamable-http', url: options.mcpUrl };
+  }
+
+  throw new Error(
+    `Unknown transport type: ${transportType}. Valid values: stdio, sse, streamable-http`
+  );
+}
+
 const program = new Command();
 
 program
@@ -44,12 +79,36 @@ program
   .option('--submitted-by <name>', 'person or runner label', 'local-user')
   .option('--ingest-url <url>', 'POST endpoint for report ingestion')
   .option('--ingest-key <key>', 'Bearer token for ingestion auth')
-  .option('--dry-run', 'run with dry-run MCP adapter', false)
+  .option('--dry-run', 'run with dry-run MCP adapter (no live server needed)', false)
+  .option(
+    '--transport <type>',
+    'MCP transport type: stdio | sse | streamable-http (default: stdio)'
+  )
+  .option(
+    '--mcp-command <cmd>',
+    'command to launch MCP server process (stdio transport)'
+  )
+  .option(
+    '--mcp-args <args>',
+    'space-separated arguments for MCP server command (stdio transport)'
+  )
+  .option(
+    '--mcp-url <url>',
+    'URL of running MCP server (sse or streamable-http transport)'
+  )
   .action(async (options) => {
     const workspaceRoot = process.env.INIT_CWD ?? process.cwd();
     const reportPath = resolve(workspaceRoot, options.out);
     const casesPath = resolve(workspaceRoot, options.cases);
     mkdirSync(dirname(reportPath), { recursive: true });
+
+    const mcpTransportConfig = buildTransportConfig({
+      transport: options.transport,
+      mcpCommand: options.mcpCommand,
+      mcpArgs: options.mcpArgs,
+      mcpUrl: options.mcpUrl,
+      dryRun: Boolean(options.dryRun)
+    });
 
     const report = await runSuite({
       suiteName: options.suite,
@@ -57,7 +116,8 @@ program
       modelName: options.model,
       casesPath,
       dryRun: Boolean(options.dryRun),
-      deterministicWeight: 0.7
+      deterministicWeight: 0.7,
+      mcpTransportConfig
     });
 
     writeReport(report, reportPath);
