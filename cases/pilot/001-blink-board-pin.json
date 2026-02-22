@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "001-blink-board-pin",
+  "title": "Blink with board pin mapping",
+  "category": "deterministic",
+  "difficulty": "easy",
+  "tags": ["compile", "blink", "board"],
+  "prompt": "Create an Arduino sketch that blinks the onboard LED and compiles for Arduino Uno.",
+  "context": {
+    "board": "arduino:avr:uno",
+    "constraints": ["Use board default LED pin", "Avoid blocking delays longer than 1000ms"],
+    "assumptionsAllowed": true
+  },
+  "requiredCapabilities": ["project_init", "file_write", "compile"],
+  "objectiveChecks": [
+    { "id": "cap-compile", "type": "requires_capability", "value": "compile", "required": true, "weight": 0.5 },
+    { "id": "prompt-board", "type": "requires_prompt_contains", "value": "Arduino Uno", "required": true, "weight": 0.5 }
+  ]
+}

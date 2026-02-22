@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "003-compile-recovery",
+  "title": "Compile error recovery",
+  "category": "deterministic",
+  "difficulty": "medium",
+  "tags": ["compile", "debug", "recovery"],
+  "prompt": "Fix a sketch that fails compilation due to a missing semicolon and compile again.",
+  "context": {
+    "board": "arduino:avr:uno",
+    "constraints": ["Keep original structure", "Only minimal fix"],
+    "assumptionsAllowed": true
+  },
+  "requiredCapabilities": ["file_write", "compile"],
+  "objectiveChecks": [
+    { "id": "cap-compile", "type": "requires_capability", "value": "compile", "required": true, "weight": 0.7 },
+    { "id": "prompt-fix", "type": "requires_prompt_contains", "value": "Fix", "required": true, "weight": 0.3 }
+  ]
+}

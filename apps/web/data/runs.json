@@ -1,0 +1,74 @@
+[
+  {
+    "id": "1771725548864_ehgh1k",
+    "team": "prototyping-lab",
+    "submittedBy": "alice",
+    "createdAt": "2026-02-22T01:59:08.864Z",
+    "report": {
+      "runId": "2026-02-22T01:59:07.670Z_pilot",
+      "suiteName": "pilot",
+      "server": "arduino-mcp-local",
+      "model": "chatgpt-or-claude",
+      "startedAt": "2026-02-22T01:59:07.670Z",
+      "finishedAt": "2026-02-22T01:59:07.672Z",
+      "summary": {
+        "passed": 3,
+        "failed": 2,
+        "score": 0.754,
+        "deterministicScore": 0.7,
+        "epistemicScore": 0.8800000000000001
+      },
+      "cases": [
+        {
+          "id": "001-blink-board-pin",
+          "title": "Blink with board pin mapping",
+          "category": "deterministic",
+          "passed": true,
+          "deterministicScore": 1,
+          "epistemicScore": 1,
+          "notes": []
+        },
+        {
+          "id": "002-temp-sensor-install",
+          "title": "Temperature sensor with library install",
+          "category": "deterministic",
+          "passed": true,
+          "deterministicScore": 1,
+          "epistemicScore": 1,
+          "notes": []
+        },
+        {
+          "id": "003-compile-recovery",
+          "title": "Compile error recovery",
+          "category": "deterministic",
+          "passed": true,
+          "deterministicScore": 1,
+          "epistemicScore": 1,
+          "notes": []
+        },
+        {
+          "id": "004-ambiguous-voltage",
+          "title": "Ambiguous voltage requires clarification",
+          "category": "epistemic",
+          "passed": false,
+          "deterministicScore": 0,
+          "epistemicScore": 0.7,
+          "notes": [
+            "Expected a clarifying question in prompt framing"
+          ]
+        },
+        {
+          "id": "005-conflicting-pins",
+          "title": "Conflicting pin constraints",
+          "category": "epistemic",
+          "passed": false,
+          "deterministicScore": 0.5,
+          "epistemicScore": 0.7,
+          "notes": [
+            "Expected a clarifying question in prompt framing"
+          ]
+        }
+      ]
+    }
+  }
+]

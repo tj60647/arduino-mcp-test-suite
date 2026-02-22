@@ -1,0 +1,26 @@
+{
+  "name": "arduino-mcp-test-suite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript eval suite for Arduino-focused MCP servers",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "clean": "npm run -ws clean",
+    "typecheck": "tsc -b tsconfig.json --pretty",
+    "run-suite": "npm run --workspace @arduino-mcp/cli run-suite",
+    "run-suite:dry": "npm run --workspace @arduino-mcp/cli run-suite -- --dry-run",
+    "web:dev": "npm run --workspace @arduino-mcp/web dev",
+    "web:build": "npm run --workspace @arduino-mcp/web build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
