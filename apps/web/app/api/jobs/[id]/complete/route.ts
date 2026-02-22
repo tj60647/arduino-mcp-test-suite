@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { checkAuthHeader } from '@/lib/apiAuth';
 import { completeJob } from '@/lib/jobStore';
 import { completeJobSchema } from '@/lib/jobValidation';
 import { addRun } from '@/lib/store';
+import { authorizeWorkerRequest } from '@/lib/workerAuth';
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  if (!checkAuthHeader(request.headers.get('authorization'))) {
+  const auth = await authorizeWorkerRequest(request);
+  if (!auth.ok) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

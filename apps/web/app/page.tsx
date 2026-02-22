@@ -3,7 +3,13 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { addEndpoint, deleteEndpoint, listEndpoints } from '@/lib/endpointRepository';
 import { createRunRepository } from '@/lib/runRepository';
-import type { EvalJob, McpEndpoint, StoredRun } from '@/lib/types';
+import type {
+  EvalJob,
+  McpEndpoint,
+  RegisteredWorker,
+  StoredRun,
+  WorkerInfo
+} from '@/lib/types';
 
 const repository = createRunRepository('local');
 
@@ -41,18 +47,44 @@ function statusBadgeClass(status: EvalJob['status']): string {
   return 'badge-neutral';
 }
 
+function isWorkerOnline(lastSeenAt: string): boolean {
+  return Date.now() - new Date(lastSeenAt).getTime() < 15_000;
+}
+
+function workerStatusBadge(worker: WorkerInfo): string {
+  return isWorkerOnline(worker.lastSeenAt)
+    ? worker.status === 'busy'
+      ? 'badge-neutral'
+      : 'badge-pass'
+    : 'badge-fail';
+}
+
+function workerStatusLabel(worker: WorkerInfo): string {
+  if (!isWorkerOnline(worker.lastSeenAt)) {
+    return 'offline';
+  }
+
+  return worker.status;
+}
+
 export default function HomePage() {
   const [runs, setRuns] = useState<StoredRun[]>([]);
   const [endpoints, setEndpoints] = useState<McpEndpoint[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [copied, setCopied] = useState(false);
   const [endpointName, setEndpointName] = useState('');
   const [endpointTransport, setEndpointTransport] = useState<McpEndpoint['transport']>('sse');
   const [endpointUrlOrCommand, setEndpointUrlOrCommand] = useState('');
   const [endpointAuthEnvVar, setEndpointAuthEnvVar] = useState('');
   const [endpointNotes, setEndpointNotes] = useState('');
   const [jobs, setJobs] = useState<EvalJob[]>([]);
+  const [workers, setWorkers] = useState<WorkerInfo[]>([]);
+  const [registeredWorkers, setRegisteredWorkers] = useState<RegisteredWorker[]>([]);
+  const [adminApiKey, setAdminApiKey] = useState('');
+  const [newWorkerId, setNewWorkerId] = useState('');
+  const [issuedWorkerToken, setIssuedWorkerToken] = useState<string | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [isWorkerAdminBusy, setIsWorkerAdminBusy] = useState(false);
   const [isJobBusy, setIsJobBusy] = useState(false);
   const [jobEndpointId, setJobEndpointId] = useState('');
   const [jobServerName, setJobServerName] = useState('mcp-api-server');
@@ -77,12 +109,14 @@ export default function HomePage() {
     void refreshRuns();
     void refreshEndpoints();
     void refreshJobs();
+    void refreshWorkers();
   }, []);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       void refreshJobs();
       void refreshRuns();
+      void refreshWorkers();
     }, 3000);
 
     return () => window.clearInterval(intervalId);
@@ -129,6 +163,161 @@ export default function HomePage() {
       setJobs(payload.jobs);
     } catch {
       // ignore temporary fetch failures during polling
+    }
+  }
+
+  async function refreshWorkers(): Promise<void> {
+    try {
+      const response = await fetch('/api/workers', { cache: 'no-store' });
+      if (!response.ok) {
+        return;
+      }
+      const payload = (await response.json()) as { workers: WorkerInfo[] };
+      setWorkers(payload.workers);
+    } catch {
+      // ignore temporary fetch failures during polling
+    }
+  }
+
+  async function refreshRegisteredWorkers(): Promise<void> {
+    if (!adminApiKey.trim()) {
+      setMessage('Enter admin API key to load registered workers.');
+      return;
+    }
+
+    setIsWorkerAdminBusy(true);
+    try {
+      const response = await fetch('/api/workers/registry', {
+        headers: { authorization: `Bearer ${adminApiKey.trim()}` },
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to load registered workers (${response.status}): ${text}`);
+      }
+
+      const payload = (await response.json()) as { workers: RegisteredWorker[] };
+      setRegisteredWorkers(payload.workers);
+      setMessage(`Loaded ${payload.workers.length} registered worker(s).`);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsWorkerAdminBusy(false);
+    }
+  }
+
+  async function handleRegisterWorker(): Promise<void> {
+    if (!adminApiKey.trim()) {
+      setMessage('Admin API key is required to register workers.');
+      return;
+    }
+
+    if (!newWorkerId.trim()) {
+      setMessage('Worker ID is required.');
+      return;
+    }
+
+    setIsWorkerAdminBusy(true);
+    setIssuedWorkerToken(null);
+    setTokenCopied(false);
+    try {
+      const response = await fetch('/api/workers/registry', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${adminApiKey.trim()}`,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({ workerId: newWorkerId.trim() })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Registration failed (${response.status}): ${text}`);
+      }
+
+      const payload = (await response.json()) as { workerId: string; token: string };
+      setIssuedWorkerToken(payload.token);
+      setNewWorkerId(payload.workerId);
+      await refreshRegisteredWorkers();
+      setMessage(`Worker registered: ${payload.workerId}`);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsWorkerAdminBusy(false);
+    }
+  }
+
+  async function handleRotateWorkerToken(workerId: string): Promise<void> {
+    if (!adminApiKey.trim()) {
+      setMessage('Admin API key is required to rotate worker tokens.');
+      return;
+    }
+
+    setIsWorkerAdminBusy(true);
+    setIssuedWorkerToken(null);
+    setTokenCopied(false);
+    try {
+      const response = await fetch(`/api/workers/registry/${encodeURIComponent(workerId)}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${adminApiKey.trim()}` }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Token rotation failed (${response.status}): ${text}`);
+      }
+
+      const payload = (await response.json()) as { workerId: string; token: string };
+      setIssuedWorkerToken(payload.token);
+      setNewWorkerId(payload.workerId);
+      await refreshRegisteredWorkers();
+      setMessage(`Token rotated for worker: ${payload.workerId}`);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsWorkerAdminBusy(false);
+    }
+  }
+
+  async function handleRevokeWorkerToken(workerId: string): Promise<void> {
+    if (!adminApiKey.trim()) {
+      setMessage('Admin API key is required to revoke worker tokens.');
+      return;
+    }
+
+    setIsWorkerAdminBusy(true);
+    try {
+      const response = await fetch(`/api/workers/registry/${encodeURIComponent(workerId)}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${adminApiKey.trim()}` }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Token revoke failed (${response.status}): ${text}`);
+      }
+
+      await refreshRegisteredWorkers();
+      setMessage(`Token revoked for worker: ${workerId}`);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsWorkerAdminBusy(false);
+    }
+  }
+
+  async function handleCopyWorkerToken(): Promise<void> {
+    if (!issuedWorkerToken) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(issuedWorkerToken);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    } catch {
+      setMessage('Failed to copy token. Copy it manually from the text block.');
     }
   }
 
@@ -315,15 +504,6 @@ export default function HomePage() {
     }
   }
 
-  function handleCopyCommand(): void {
-    void navigator.clipboard
-      .writeText('npm run run-suite:dry -- --pack general --team my-team --submitted-by me')
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
-  }
-
   return (
     <main>
       {/* ── Hero ──────────────────────────────────────────────────────── */}
@@ -349,18 +529,17 @@ export default function HomePage() {
         </div>
         <div className="workflow-step">
           <div className="step-number">2</div>
-          <h3>Run the evaluator</h3>
+          <h3>Verify worker capacity</h3>
           <p>
-            Execute one CLI command on your machine. It sends benchmark scenarios to your server,
-            records every response, and writes a results file.
+            Check that at least one worker is online and ready before queuing evaluations.
           </p>
         </div>
         <div className="workflow-step">
           <div className="step-number">3</div>
-          <h3>Review the results</h3>
+          <h3>Queue a remote run</h3>
           <p>
-            Import the results file here to see pass/fail outcomes and scores — or share the JSON
-            with your team.
+            Submit benchmark jobs directly from web. Workers execute MCP/API scenarios and push
+            progress updates automatically.
           </p>
         </div>
       </div>
@@ -372,8 +551,8 @@ export default function HomePage() {
           Register your MCP server
         </h2>
         <p className="section-desc">
-          Add one profile per MCP server. Profiles are stored in your browser and referenced when
-          you run the evaluator CLI.
+          Add one profile per MCP server/API endpoint. Profiles are stored in your browser and
+          reused when queuing jobs.
         </p>
 
         <div className="form-row">
@@ -516,42 +695,184 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* ── Step 2: Run the CLI ────────────────────────────────────────── */}
       <div className="section-card">
         <h2>
           <span className="step-number small">2</span>
-          Run the evaluator
+          Managed workers
         </h2>
         <p className="section-desc">
-          The evaluator runs entirely on your local machine. It sends the test cases to your MCP
-          server, scores every response, and writes a <code>reports/run-report.json</code> file
-          you can import below.
+          Workers execute queued MCP/API evaluations. This panel shows current availability and
+          recent heartbeat activity.
         </p>
 
-        <p className="cmd-label">
-          Try it now — offline dry run (no server required, uses stub responses):
-        </p>
-        <div className="cli-block">
-          <span className="cli-prompt">$</span>
-          {' npm run run-suite:dry -- --pack general --team my-team --submitted-by me'}
-          <button type="button" className="cli-copy" onClick={handleCopyCommand}>
-            {copied ? 'Copied!' : 'Copy'}
+        <div className="queue-panel" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+          <p className="cmd-label">Register approved worker</p>
+          <div className="form-row" style={{ marginTop: 10 }}>
+            <div className="form-field">
+              <label htmlFor="admin-api-key">Admin API key</label>
+              <input
+                id="admin-api-key"
+                type="password"
+                placeholder="INGEST_API_KEY"
+                value={adminApiKey}
+                onChange={(e) => setAdminApiKey(e.target.value)}
+                disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="new-worker-id">Worker ID</label>
+              <input
+                id="new-worker-id"
+                type="text"
+                placeholder="worker-1"
+                value={newWorkerId}
+                onChange={(e) => setNewWorkerId(e.target.value)}
+                disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+              />
+            </div>
+          </div>
+
+          <div className="toolbar">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void handleRegisterWorker()}
+              disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+            >
+              Register worker
+            </button>
+            <button
+              type="button"
+              onClick={() => void refreshRegisteredWorkers()}
+              disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+            >
+              Load registered workers
+            </button>
+          </div>
+
+          {issuedWorkerToken ? (
+            <div className="token-block">
+              <strong>Worker token (shown once — save now):</strong>
+              <div className="code" style={{ marginTop: 6 }}>{issuedWorkerToken}</div>
+              <div className="toolbar" style={{ marginTop: 10, marginBottom: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyWorkerToken()}
+                  disabled={isBusy || isJobBusy || isWorkerAdminBusy}
+                >
+                  {tokenCopied ? 'Copied' : 'Copy token'}
+                </button>
+              </div>
+              <p className="help-text" style={{ marginTop: 8 }}>
+                This token will not be shown again after refresh. Store it in your worker secret
+                manager before leaving this page.
+              </p>
+            </div>
+          ) : null}
+
+          <table style={{ marginTop: 14 }}>
+            <thead>
+              <tr>
+                <th>Registered worker</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {registeredWorkers.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="empty-cell">
+                    No registered workers loaded.
+                  </td>
+                </tr>
+              ) : (
+                registeredWorkers.map((worker) => (
+                  <tr key={`${worker.workerId}-${worker.createdAt}`}>
+                    <td className="code">{worker.workerId}</td>
+                    <td>{new Date(worker.createdAt).toLocaleString()}</td>
+                    <td>
+                      {worker.revokedAt ? (
+                        <span className="badge-fail">revoked</span>
+                      ) : (
+                        <span className="badge-pass">active</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="toolbar" style={{ marginBottom: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => void handleRotateWorkerToken(worker.workerId)}
+                          disabled={isBusy || isJobBusy || isWorkerAdminBusy || Boolean(worker.revokedAt)}
+                        >
+                          Rotate token
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          onClick={() => void handleRevokeWorkerToken(worker.workerId)}
+                          disabled={isBusy || isJobBusy || isWorkerAdminBusy || Boolean(worker.revokedAt)}
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="toolbar">
+          <button type="button" onClick={() => void refreshWorkers()} disabled={isBusy || isJobBusy}>
+            Refresh workers
           </button>
         </div>
 
-        <p className="cmd-label" style={{ marginTop: 20 }}>
-          Live mode — test a real MCP server over SSE:
-        </p>
-        <div className="cli-block">
-          <span className="cli-prompt">$</span>
-          {' npm run run-suite -- --server my-mcp-server \\'}
-          <br />
-          {'    --transport sse --mcp-url https://your-server.example.com/mcp'}
-        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Worker</th>
+              <th>Status</th>
+              <th>Current job</th>
+              <th>Host</th>
+              <th>Last seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {workers.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="empty-cell">
+                  No workers reporting yet. Start at least one worker to process queued runs.
+                </td>
+              </tr>
+            ) : (
+              workers.map((worker) => (
+                <tr key={worker.workerId}>
+                  <td className="code">{worker.workerId}</td>
+                  <td>
+                    <span className={workerStatusBadge(worker)}>{workerStatusLabel(worker)}</span>
+                  </td>
+                  <td className="code">{worker.currentJobId ?? '—'}</td>
+                  <td>{worker.host ?? '—'}</td>
+                  <td>{new Date(worker.lastSeenAt).toLocaleString()}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-        <p className="help-text" style={{ marginTop: 12 }}>
-          Add <code>--ingest-url http://localhost:3000/api/runs</code> to push results directly
-          to this dashboard instead of importing the JSON manually.
+      {/* ── Step 2: Queue a remote run ─────────────────────────────────── */}
+      <div className="section-card">
+        <h2>
+          <span className="step-number small">3</span>
+          Queue a remote run
+        </h2>
+        <p className="section-desc">
+          Submit a job from this form. A worker process executes the evaluation remotely and pushes
+          status updates plus final report data back to this dashboard.
         </p>
 
         <div className="queue-panel">
@@ -680,7 +1001,7 @@ export default function HomePage() {
                 Dry run (no live MCP connection)
               </label>
               <p className="help-text" style={{ marginTop: 6 }}>
-                When disabled, a running worker will connect using the selected transport.
+                When disabled, a running worker connects to the selected MCP/API endpoint.
               </p>
             </div>
           </div>
@@ -739,12 +1060,12 @@ export default function HomePage() {
       {/* ── Step 3: Results ───────────────────────────────────────────── */}
       <div className="section-card">
         <h2>
-          <span className="step-number small">3</span>
+          <span className="step-number small">4</span>
           Test results
         </h2>
         <p className="section-desc">
-          Import a <code>run-report.json</code> to add results, or export everything as JSON to
-          share with your team. Results are stored in your browser.
+          Completed jobs appear here automatically. You can also import a <code>run-report.json</code>
+          manually, or export all results as JSON for sharing.
         </p>
 
         <div className="toolbar">

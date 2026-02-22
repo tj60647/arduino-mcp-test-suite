@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
-import { claimNextQueuedJob } from '@/lib/jobStore';
+import { listWorkers, upsertWorkerHeartbeat } from '@/lib/workerStore';
 import { authorizeWorkerRequest } from '@/lib/workerAuth';
-import { claimJobSchema } from '@/lib/jobValidation';
+import { workerHeartbeatSchema } from '@/lib/workerValidation';
+
+export async function GET() {
+  const workers = await listWorkers();
+  return NextResponse.json({ workers });
+}
 
 export async function POST(request: Request) {
   const auth = await authorizeWorkerRequest(request);
@@ -10,7 +15,7 @@ export async function POST(request: Request) {
   }
 
   const payload = await request.json();
-  const parsed = claimJobSchema.safeParse(payload);
+  const parsed = workerHeartbeatSchema.safeParse(payload);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid payload', details: parsed.error.flatten() },
@@ -22,10 +27,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'workerId header/body mismatch' }, { status: 403 });
   }
 
-  const job = await claimNextQueuedJob(parsed.data.workerId);
-  if (!job) {
-    return new NextResponse(null, { status: 204 });
-  }
-
-  return NextResponse.json({ job });
+  const worker = await upsertWorkerHeartbeat(parsed.data);
+  return NextResponse.json({ worker }, { status: 200 });
 }

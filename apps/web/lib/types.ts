@@ -89,3 +89,20 @@ export interface EvalJob {
   events: JobEvent[];
   reportId?: string;
 }
+
+export type WorkerState = 'idle' | 'busy';
+
+export interface WorkerInfo {
+  workerId: string;
+  status: WorkerState;
+  lastSeenAt: string;
+  currentJobId?: string;
+  host?: string;
+  version?: string;
+}
+
+export interface RegisteredWorker {
+  workerId: string;
+  createdAt: string;
+  revokedAt?: string;
+}

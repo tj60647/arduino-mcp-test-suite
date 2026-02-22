@@ -26,7 +26,7 @@ MCP server ecosystems vary heavily in tool naming, capability depth, and safety 
 - TypeScript runner for MCP-connected scenarios
 - Eval case schema (JSON)
 - Scoring engine with weighted rubric (task + epistemic)
-- CLI + optional web dashboard endpoint for reports
+- Web control plane for remote runs + worker execution plane
 - Baseline benchmark pack (10 scenarios)
 
 See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md).
@@ -53,7 +53,7 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 - Epistemic rubric scores from structured judge prompts + rule checks
 - Produce a single JSON + HTML report artifact per run
 
-## Quickstart (scaffolded MVP)
+## Quickstart (web-first remote flow)
 
 1. Install dependencies:
 
@@ -63,11 +63,52 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 
 	`npm run build`
 
-3. Run the general API suite in dry-run mode:
+3. Start web control plane:
+
+	`npm run web:dev`
+
+4. Start a worker (local dev):
+
+	`npm run run-worker -- --control-plane http://localhost:3000`
+
+5. Open dashboard:
+
+	`http://localhost:3000`
+
+6. In **Managed workers**, register an approved worker and confirm it is online, then queue a run from the web UI.
+
+## Register approved workers (recommended)
+
+Preferred path: use the **Managed workers** section in the dashboard to register worker IDs and issue tokens.
+When a token is issued, copy/store it immediately (it is treated as one-time display output).
+The same panel supports token rotation and revocation.
+
+Use per-worker tokens so only approved workers can claim jobs and report results.
+
+1. Register a worker (admin key required):
+
+```bash
+curl -X POST http://localhost:3000/api/workers/registry \
+	-H "authorization: Bearer <INGEST_API_KEY>" \
+	-H "content-type: application/json" \
+	-d '{"workerId":"worker-1"}'
+```
+
+2. Start worker with token:
+
+	`npm run run-worker -- --control-plane http://localhost:3000 --worker-id worker-1 --worker-token <TOKEN>`
+
+`INGEST_API_KEY` bearer auth still works for admin operations.
+
+## CLI (advanced / fallback)
+
+Use CLI directly only when you need terminal-driven workflows.
+
+1. Run the general API suite in dry-run mode:
 
 	`npm run run-suite:dry -- --pack general`
 
-4. Open the generated report:
+2. Open the generated report:
 
 	`reports/run-report.json`
 
@@ -83,11 +124,11 @@ This repo now includes a web control plane at `apps/web` using browser local sto
 
 	`http://localhost:3000`
 
-3. Generate a run report JSON from CLI:
+3. (Optional) Generate and import a run report JSON from CLI:
 
 	`npm run run-suite:dry -- --team prototyping-lab --submitted-by alice`
 
-4. Upload JSON in the dashboard using **Upload JSON**.
+4. Upload JSON in the dashboard using **Import report JSON**.
 
 5. Share state between people via **Download JSON** and re-upload on another browser.
 
@@ -100,7 +141,7 @@ This repo now includes a web control plane at `apps/web` using browser local sto
 	- URL/command
 	- optional auth env var + notes
 3. Click **Create Endpoint**.
-4. Use the endpoint name in CLI runs (current runner labels server by this name):
+4. Use the endpoint name in queued web jobs or CLI runs:
 
 	`npm run run-suite:dry -- --server <endpoint-name> --model claude-sonnet`
 
@@ -145,6 +186,8 @@ curl -X POST http://localhost:3000/api/jobs \
 	`curl http://localhost:3000/api/jobs/<job-id>`
 
 Completed jobs automatically persist their report to the runs store (`/api/runs`).
+
+For non-technical users, this queue-based web flow is the recommended default.
 
 ## Current CLI options
 
@@ -213,4 +256,4 @@ When prompted, choose the current repo and set project root to `apps/web`.
 
 ## Next step
 
-Implement Phase 1 from [docs/roadmap.md](docs/roadmap.md): local CLI runner + schema validation + 5 mechanistic cases.
+Implement worker orchestration hardening from [docs/roadmap.md](docs/roadmap.md): managed worker pools, auth, and richer run observability.

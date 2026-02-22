@@ -17,7 +17,8 @@ Initial benchmark pack: **general MCP/API workflows**.
 - Scenario execution engine with step traces
 - Objective checkers (tool-use correctness, schema-valid output, compile status)
 - Epistemic rubric scoring (uncertainty handling, clarification behavior, constraint adherence)
-- CLI for local execution
+- Web control plane for non-technical users + worker execution backend
+- CLI as optional operator/debug tool
 - Vercel-hosted API/UI to view runs and compare results
 
 ### Out-of-scope (MVP)
@@ -120,12 +121,12 @@ For educational use, optionally invert to 50/50 to emphasize reasoning quality.
 - can connect to one MCP server and list tools
 - can run one no-op scenario and store trace
 
-## Phase 1 — Local CLI MVP (2 weeks)
+## Phase 1 — Execution engine MVP (2 weeks)
 
 - scenario runner with retries/timeouts
 - objective checker module
 - 5 mechanistic cases
-- JSON report output + CLI summary table
+- JSON report output + worker-readable progress state
 
 **Exit criteria**
 - repeatable run with stable pass/fail on same environment
