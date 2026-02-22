@@ -11,6 +11,22 @@ import type {
   WorkerInfo
 } from '@/lib/types';
 
+type McpToolInfo = {
+  name: string;
+  description: string;
+  inputKeys: string[];
+  requiredKeys: string[];
+};
+
+type McpInfoData = {
+  connected: boolean;
+  serverName: string;
+  tools: string[];
+  toolDetails: McpToolInfo[];
+  resources: string[];
+  prompts: string[];
+};
+
 const repository = createRunRepository('local');
 
 function scoreClass(score: number): string {
@@ -77,6 +93,35 @@ function workerStatusLabel(worker: WorkerInfo): string {
   return worker.status;
 }
 
+function suggestInputKeyForTool(toolName: string): string {
+  const lower = toolName.toLowerCase();
+  if (lower.includes('ask_question') || lower.includes('question')) return 'question';
+  if (lower.includes('search') || lower.includes('find') || lower.includes('query')) return 'query';
+  if (lower.includes('prompt') || lower.includes('chat') || lower.includes('complete')) return 'prompt';
+  return 'input';
+}
+
+function uniqueInputKeys(toolInfo: McpToolInfo | undefined, fallbackKey: string): string[] {
+  const base = toolInfo?.inputKeys ?? [];
+  const normalized = base.filter((value) => value.trim().length > 0);
+  const defaults = [fallbackKey, 'question', 'input', 'query', 'prompt', 'text', 'message'];
+  return [...new Set([...normalized, ...defaults])];
+}
+
+function suggestBestTool(tools: string[]): string {
+  if (tools.length === 0) return '';
+
+  const priority = ['ask_question', 'chat', 'prompt', 'complete', 'query', 'search', 'read'];
+  const loweredTools = tools.map((tool) => ({ tool, lower: tool.toLowerCase() }));
+
+  for (const key of priority) {
+    const hit = loweredTools.find((item) => item.lower.includes(key));
+    if (hit) return hit.tool;
+  }
+
+  return tools[0];
+}
+
 export default function HomePage() {
   const [runs, setRuns] = useState<StoredRun[]>([]);
   const [endpoints, setEndpoints] = useState<McpEndpoint[]>([]);
@@ -113,7 +158,11 @@ export default function HomePage() {
   const [singleInputTool, setSingleInputTool] = useState('');
   const [isSingleInputBusy, setIsSingleInputBusy] = useState(false);
   const [mcpInfoResult, setMcpInfoResult] = useState('');
+  const [mcpInfoData, setMcpInfoData] = useState<McpInfoData | null>(null);
   const [isMcpInfoBusy, setIsMcpInfoBusy] = useState(false);
+  const [suggestedTool, setSuggestedTool] = useState('');
+  const [suggestedInputKey, setSuggestedInputKey] = useState('input');
+  const [requiredInputValues, setRequiredInputValues] = useState<Record<string, string>>({});
   const [showAdvancedJobOptions, setShowAdvancedJobOptions] = useState(false);
   const [showWorkerSetup, setShowWorkerSetup] = useState(false);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
@@ -130,6 +179,27 @@ export default function HomePage() {
   const onlineWorkerCount = useMemo(() => {
     return workers.filter((worker) => isWorkerOnline(worker.lastSeenAt)).length;
   }, [workers]);
+
+  const selectedEndpoint = useMemo(() => {
+    return endpoints.find((endpoint) => endpoint.id === jobEndpointId);
+  }, [endpoints, jobEndpointId]);
+
+  const selectedToolInfo = useMemo(() => {
+    if (!mcpInfoData || !suggestedTool) {
+      return undefined;
+    }
+
+    return mcpInfoData.toolDetails.find((tool) => tool.name === suggestedTool);
+  }, [mcpInfoData, suggestedTool]);
+
+  const availableInputKeys = useMemo(() => {
+    return uniqueInputKeys(selectedToolInfo, suggestedInputKey);
+  }, [selectedToolInfo, suggestedInputKey]);
+
+  const requiredExtraKeys = useMemo(() => {
+    const required = selectedToolInfo?.requiredKeys ?? [];
+    return required.filter((key) => key !== suggestedInputKey);
+  }, [selectedToolInfo, suggestedInputKey]);
 
   useEffect(() => {
     void refreshRuns();
@@ -161,7 +231,7 @@ export default function HomePage() {
   }, [denseMode]);
 
   useEffect(() => {
-    if (endpoints.length === 1 && !jobEndpointId) {
+    if (endpoints.length > 0 && !jobEndpointId) {
       handleSelectJobEndpoint(endpoints[0].id);
       return;
     }
@@ -170,6 +240,16 @@ export default function HomePage() {
       setJobEndpointId('');
     }
   }, [endpoints, jobEndpointId]);
+
+  useEffect(() => {
+    if (!selectedEndpoint) {
+      setMcpInfoData(null);
+      setMcpInfoResult('');
+      setSuggestedTool('');
+      setSuggestedInputKey('input');
+      setRequiredInputValues({});
+    }
+  }, [selectedEndpoint]);
 
   async function refreshRuns(): Promise<void> {
     const localRuns = await repository.listRuns();
@@ -423,7 +503,7 @@ export default function HomePage() {
         setJobTransport(existingByUrl.transport);
         setJobUrlOrCommand(existingByUrl.urlOrCommand);
         setJobDryRun(false);
-        setMessage(`Endpoint selected: ${existingByUrl.name}`);
+        await fetchAndApplyMcpInfo(existingByUrl.name, existingByUrl.transport, existingByUrl.urlOrCommand);
         return;
       }
 
@@ -456,10 +536,12 @@ export default function HomePage() {
         setJobTransport(created.transport);
         setJobUrlOrCommand(created.urlOrCommand);
         setJobDryRun(false);
+        await fetchAndApplyMcpInfo(created.name, created.transport, created.urlOrCommand);
+      } else {
+        setMessage(`Endpoint connected: ${candidate}.`);
       }
 
       setQuickEndpointUrl('');
-      setMessage(`Endpoint connected: ${candidate}. You can now click Queue quick test.`);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -554,6 +636,87 @@ export default function HomePage() {
     setJobTransport(endpoint.transport);
     setJobUrlOrCommand(endpoint.urlOrCommand);
     setJobDryRun(false);
+    void fetchAndApplyMcpInfo(endpoint.name, endpoint.transport, endpoint.urlOrCommand);
+  }
+
+  async function fetchAndApplyMcpInfo(
+    serverName: string,
+    transport: McpEndpoint['transport'],
+    urlOrCommand: string
+  ): Promise<void> {
+    try {
+      let transportConfig:
+        | { type: 'stdio'; command: string; args: string[] }
+        | { type: 'sse' | 'streamable-http'; url: string };
+
+      if (transport === 'stdio') {
+        const parsed = parseStdioCommand(urlOrCommand);
+        if (!parsed.command) {
+          throw new Error('Could not parse stdio command while reading MCP info.');
+        }
+        transportConfig = { type: 'stdio', command: parsed.command, args: parsed.args };
+      } else {
+        transportConfig = { type: transport, url: urlOrCommand.trim() };
+      }
+
+      const response = await fetch('/api/mcp-info', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          serverName,
+          mcpTransportConfig: transportConfig
+        })
+      });
+
+      const payload = (await response.json()) as {
+        connected?: boolean;
+        tools?: string[];
+        toolDetails?: Array<{ name: string; description: string; inputKeys: string[]; requiredKeys: string[] }>;
+        resources?: string[];
+        prompts?: string[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Get MCP info failed (${response.status})`);
+      }
+
+      const tools = payload.tools ?? [];
+      const toolDetails = payload.toolDetails ?? tools.map((name) => ({
+        name,
+        description: '',
+        inputKeys: [],
+        requiredKeys: []
+      }));
+      const bestTool = suggestBestTool(tools);
+      const selectedInfo = toolDetails.find((tool) => tool.name === bestTool);
+      const key = selectedInfo?.inputKeys?.[0] ?? (bestTool ? suggestInputKeyForTool(bestTool) : 'input');
+
+      setSuggestedTool(bestTool);
+      setSuggestedInputKey(key);
+      setRequiredInputValues({});
+      setMcpInfoData({
+        connected: true,
+        serverName,
+        tools,
+        toolDetails,
+        resources: payload.resources ?? [],
+        prompts: payload.prompts ?? []
+      });
+      setMcpInfoResult(JSON.stringify(payload, null, 2));
+      setMessage(
+        bestTool
+          ? `Endpoint connected. Suggested tool: ${bestTool}. Request format selected automatically.`
+          : 'Endpoint connected. No tools were returned by MCP info.'
+      );
+    } catch (error) {
+      setSuggestedTool('');
+      setSuggestedInputKey('input');
+      setRequiredInputValues({});
+      setMcpInfoData(null);
+      setMcpInfoResult('');
+      setMessage((error as Error).message);
+    }
   }
 
   function buildTransportConfigFromCurrentSelection():
@@ -628,6 +791,12 @@ export default function HomePage() {
       return;
     }
 
+    const missingRequired = requiredExtraKeys.filter((key) => !(requiredInputValues[key] ?? '').trim());
+    if (missingRequired.length > 0) {
+      setMessage(`Fill required field(s): ${missingRequired.join(', ')}`);
+      return;
+    }
+
     setIsSingleInputBusy(true);
     setMessage('');
     setSingleInputTool('');
@@ -643,7 +812,16 @@ export default function HomePage() {
         body: JSON.stringify({
           serverName,
           input,
-          mcpTransportConfig: transportConfig
+          mcpTransportConfig: transportConfig,
+          preferredTool: suggestedTool || undefined,
+          preferredInputKey: suggestedInputKey || undefined,
+          additionalArguments: requiredExtraKeys.reduce<Record<string, string>>((acc, key) => {
+            const value = requiredInputValues[key];
+            if (typeof value === 'string' && value.trim().length > 0) {
+              acc[key] = value.trim();
+            }
+            return acc;
+          }, {})
         })
       });
 
@@ -680,33 +858,11 @@ export default function HomePage() {
     try {
       const selectedEndpoint = endpoints.find((item) => item.id === jobEndpointId);
       const serverName = (selectedEndpoint?.name ?? jobServerName).trim() || 'mcp-endpoint';
-      const transportConfig = buildLiveTransportConfigFromCurrentSelection();
-
-      const response = await fetch('/api/mcp-info', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          serverName,
-          mcpTransportConfig: transportConfig
-        })
-      });
-
-      const payload = (await response.json()) as {
-        connected?: boolean;
-        tools?: string[];
-        resources?: string[];
-        prompts?: string[];
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? `Get MCP info failed (${response.status})`);
-      }
-
-      setMcpInfoResult(JSON.stringify(payload, null, 2));
-      const toolCount = payload.tools?.length ?? 0;
-      setMessage(`Connected. Found ${toolCount} tool(s).`);
+      const selectedTransport = (selectedEndpoint?.transport ?? jobTransport);
+      const selectedUrlOrCommand = (selectedEndpoint?.urlOrCommand ?? jobUrlOrCommand);
+      await fetchAndApplyMcpInfo(serverName, selectedTransport, selectedUrlOrCommand);
     } catch (error) {
+      setMcpInfoData(null);
       setMcpInfoResult('');
       setMessage((error as Error).message);
     } finally {
@@ -909,6 +1065,66 @@ export default function HomePage() {
             </button>
           ) : null}
         </div>
+
+        {mcpInfoData ? (
+          <div className="token-block" style={{ marginTop: 14 }}>
+            <strong>MCP profile detected</strong>
+            <p className="help-text" style={{ marginTop: 8 }}>
+              Tools: {mcpInfoData.tools.length} • Resources: {mcpInfoData.resources.length} • Prompts: {mcpInfoData.prompts.length}
+            </p>
+            <div style={{ marginTop: 10 }}>
+              <p className="help-text" style={{ marginBottom: 6 }}>
+                Tool for input test:
+              </p>
+              <div className="toolbar" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
+                {mcpInfoData.toolDetails.map((tool) => (
+                  <button
+                    key={tool.name}
+                    type="button"
+                    className={tool.name === suggestedTool ? 'btn-primary' : undefined}
+                    onClick={() => {
+                      const nextTool = tool.name;
+                      setSuggestedTool(nextTool);
+                      const nextKey = tool.inputKeys?.[0] ?? suggestInputKeyForTool(nextTool);
+                      setSuggestedInputKey(nextKey);
+                      setRequiredInputValues({});
+                    }}
+                    disabled={isBusy || isSingleInputBusy || isMcpInfoBusy}
+                  >
+                    {tool.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {showAdvancedControls ? (
+              <div style={{ marginTop: 8 }}>
+                <p className="help-text" style={{ marginBottom: 6 }}>
+                  Advanced request field (only change if your MCP requires it):
+                </p>
+                <div className="toolbar" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
+                  {availableInputKeys.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={key === suggestedInputKey ? 'btn-primary' : undefined}
+                      onClick={() => setSuggestedInputKey(key)}
+                      disabled={isBusy || isSingleInputBusy || isMcpInfoBusy}
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {showAdvancedControls && mcpInfoResult ? (
+              <div className="code" style={{ marginTop: 10, whiteSpace: 'pre-wrap' }}>
+                {mcpInfoResult}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {showEndpointAdvanced ? (
           <>
@@ -1248,34 +1464,11 @@ export default function HomePage() {
         </p>
 
         <div className="queue-panel">
-          <div className="form-row" style={{ marginTop: 10 }}>
-            <div className="form-field">
-              <label htmlFor="job-endpoint-select">Endpoint</label>
-              <select
-                id="job-endpoint-select"
-                value={jobEndpointId}
-                onChange={(e) => handleSelectJobEndpoint(e.target.value)}
-                disabled={isBusy || isJobBusy || isSingleInputBusy}
-              >
-                <option value="">Custom endpoint</option>
-                {endpoints.map((ep) => (
-                  <option key={ep.id} value={ep.id}>
-                    {ep.name} ({transportLabel(ep.transport)})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="job-server-name">Server label</label>
-              <input
-                id="job-server-name"
-                type="text"
-                value={jobServerName}
-                onChange={(e) => setJobServerName(e.target.value)}
-                disabled={isBusy || isJobBusy || isSingleInputBusy}
-              />
-            </div>
-          </div>
+          <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
+            Active endpoint:{' '}
+            <strong>{selectedEndpoint ? `${selectedEndpoint.name} (${transportLabel(selectedEndpoint.transport)})` : 'none selected'}</strong>
+            {selectedEndpoint ? '' : ' — connect one in Step 1 first.'}
+          </p>
 
           <p className="cmd-label" style={{ marginTop: 20 }}>
             Single input test (live):
@@ -1284,6 +1477,11 @@ export default function HomePage() {
             Type one input and click <strong>Run input test</strong>. The app connects to your MCP,
             discovers tools, sends your input, and shows the raw response.
           </p>
+          {suggestedTool ? (
+            <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
+              Suggested from MCP info: use <strong>{suggestedTool}</strong>. The request format is handled automatically.
+            </p>
+          ) : null}
 
           <div className="form-row" style={{ marginTop: 10 }}>
             <div className="form-field full-width">
@@ -1293,38 +1491,54 @@ export default function HomePage() {
                 type="text"
                 value={singleInputText}
                 onChange={(e) => setSingleInputText(e.target.value)}
-                placeholder="e.g. summarize today's key incidents"
+                placeholder="e.g. How does authentication work?"
                 disabled={isBusy || isJobBusy || isSingleInputBusy}
               />
             </div>
           </div>
 
+          {requiredExtraKeys.length > 0 ? (
+            <div className="form-row" style={{ marginTop: 10 }}>
+              {requiredExtraKeys.map((key) => (
+                <div className="form-field" key={key}>
+                  <label htmlFor={`required-${key}`}>{key}</label>
+                  <input
+                    id={`required-${key}`}
+                    type="text"
+                    value={requiredInputValues[key] ?? ''}
+                    onChange={(e) =>
+                      setRequiredInputValues((current) => ({
+                        ...current,
+                        [key]: e.target.value
+                      }))
+                    }
+                    placeholder={`Required by ${suggestedTool || 'selected tool'}`}
+                    disabled={isBusy || isJobBusy || isSingleInputBusy}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <div className="toolbar">
-            <button
-              type="button"
-              onClick={() => void handleGetMcpInfo()}
-              disabled={isBusy || isJobBusy || isSingleInputBusy || isMcpInfoBusy}
-            >
-              {isMcpInfoBusy ? 'Getting MCP info...' : 'Get MCP info'}
-            </button>
+            {showAdvancedControls ? (
+              <button
+                type="button"
+                onClick={() => void handleGetMcpInfo()}
+                disabled={isBusy || isJobBusy || isSingleInputBusy || isMcpInfoBusy || !selectedEndpoint}
+              >
+                {isMcpInfoBusy ? 'Getting MCP info...' : 'Get MCP info'}
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn-primary"
               onClick={() => void handleRunSingleInputTest()}
-              disabled={isBusy || isJobBusy || isSingleInputBusy || isMcpInfoBusy}
+              disabled={isBusy || isJobBusy || isSingleInputBusy || isMcpInfoBusy || !selectedEndpoint}
             >
               {isSingleInputBusy ? 'Running input test...' : 'Run input test'}
             </button>
           </div>
-
-          {mcpInfoResult ? (
-            <div className="token-block" style={{ marginTop: 10 }}>
-              <strong>MCP info</strong>
-              <div className="code" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
-                {mcpInfoResult}
-              </div>
-            </div>
-          ) : null}
 
           {singleInputResult ? (
             <div className="token-block" style={{ marginTop: 10 }}>
@@ -1372,6 +1586,35 @@ export default function HomePage() {
               {showAdvancedJobOptions ? (
                 <>
           <div className="form-row">
+                <div className="form-field">
+                  <label htmlFor="job-endpoint-select">Endpoint</label>
+                  <select
+                    id="job-endpoint-select"
+                    value={jobEndpointId}
+                    onChange={(e) => handleSelectJobEndpoint(e.target.value)}
+                    disabled={isBusy || isJobBusy}
+                  >
+                    <option value="">Custom endpoint</option>
+                    {endpoints.map((ep) => (
+                      <option key={ep.id} value={ep.id}>
+                        {ep.name} ({transportLabel(ep.transport)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label htmlFor="job-server-name">Server label</label>
+                  <input
+                    id="job-server-name"
+                    type="text"
+                    value={jobServerName}
+                    onChange={(e) => setJobServerName(e.target.value)}
+                    disabled={isBusy || isJobBusy}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
             <div className="form-field">
               <label htmlFor="job-transport">Connection type</label>
               <select

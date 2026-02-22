@@ -14,6 +14,9 @@ type InputTestPayload = {
   serverName: string;
   input: string;
   mcpTransportConfig: TransportConfig;
+  preferredTool?: string;
+  preferredInputKey?: string;
+  additionalArguments?: Record<string, string>;
 };
 
 function isInputTestPayload(value: unknown): value is InputTestPayload {
@@ -74,6 +77,7 @@ function isLikelyReadOnlyToolName(name: string): boolean {
 
 function buildCandidateArgs(input: string): Array<Record<string, unknown>> {
   return [
+    { question: input },
     { input },
     { query: input },
     { text: input },
@@ -81,6 +85,22 @@ function buildCandidateArgs(input: string): Array<Record<string, unknown>> {
     { message: input },
     { instruction: input }
   ];
+}
+
+function buildCandidateArgsWithPreference(
+  input: string,
+  preferredInputKey?: string,
+  additionalArguments?: Record<string, string>
+): Array<Record<string, unknown>> {
+  const baseArgs = buildCandidateArgs(input);
+  const baseAdditional = additionalArguments ?? {};
+
+  if (!preferredInputKey || preferredInputKey.trim().length === 0) {
+    return baseArgs.map((args) => ({ ...baseAdditional, ...args }));
+  }
+
+  const preferred = { [preferredInputKey.trim()]: input };
+  return [{ ...baseAdditional, ...preferred }, ...baseArgs.map((args) => ({ ...baseAdditional, ...args }))];
 }
 
 export async function POST(request: Request) {
@@ -113,12 +133,34 @@ export async function POST(request: Request) {
     const toolNames = allTools.filter((name) => isLikelyReadOnlyToolName(name));
     const orderedTools = toolNames.length > 0 ? toolNames : allTools;
 
-    const candidateArgs = buildCandidateArgs(payload.input.trim());
+    const preferredTool = payload.preferredTool?.trim();
+    const prioritizedTools = preferredTool && orderedTools.includes(preferredTool)
+      ? [preferredTool, ...orderedTools.filter((tool) => tool !== preferredTool)]
+      : orderedTools;
 
-    for (const toolName of orderedTools) {
+    const candidateArgs = buildCandidateArgsWithPreference(
+      payload.input.trim(),
+      payload.preferredInputKey,
+      payload.additionalArguments
+    );
+
+    let lastToolError: unknown;
+    for (const toolName of prioritizedTools) {
       for (const args of candidateArgs) {
         try {
           const result = await client.callTool({ name: toolName, arguments: args });
+
+          const isErrorResult =
+            typeof result === 'object' &&
+            result !== null &&
+            'isError' in result &&
+            (result as { isError?: unknown }).isError === true;
+
+          if (isErrorResult) {
+            lastToolError = result;
+            continue;
+          }
+
           return NextResponse.json({
             connected: true,
             serverName: payload.serverName,
@@ -127,7 +169,8 @@ export async function POST(request: Request) {
             result,
             availableTools: allTools
           });
-        } catch {
+        } catch (error) {
+          lastToolError = error;
           // Try next arg shape / tool name
         }
       }
@@ -139,7 +182,8 @@ export async function POST(request: Request) {
         serverName: payload.serverName,
         error: 'Connected, but no compatible tool accepted a single text input.',
         availableTools: allTools,
-        hint: 'This MCP server may require specific structured arguments.'
+        hint: 'This MCP server may require specific structured arguments.',
+        lastToolError
       },
       { status: 400 }
     );

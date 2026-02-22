@@ -23,6 +23,45 @@ type PromptsLike = {
   prompts?: Array<{ name?: string }>;
 };
 
+type ToolLike = {
+  name: string;
+  description?: string;
+  inputSchema?: unknown;
+};
+
+function extractInputKeysFromSchema(inputSchema: unknown): string[] {
+  if (!inputSchema || typeof inputSchema !== 'object') {
+    return [];
+  }
+
+  const schema = inputSchema as {
+    properties?: Record<string, unknown>;
+    type?: string;
+  };
+
+  if (!schema.properties || typeof schema.properties !== 'object') {
+    return [];
+  }
+
+  return Object.keys(schema.properties);
+}
+
+function extractRequiredKeysFromSchema(inputSchema: unknown): string[] {
+  if (!inputSchema || typeof inputSchema !== 'object') {
+    return [];
+  }
+
+  const schema = inputSchema as {
+    required?: unknown;
+  };
+
+  if (!Array.isArray(schema.required)) {
+    return [];
+  }
+
+  return schema.required.filter((item): item is string => typeof item === 'string');
+}
+
 function isMcpInfoPayload(value: unknown): value is McpInfoPayload {
   if (!value || typeof value !== 'object') {
     return false;
@@ -76,7 +115,13 @@ export async function POST(request: Request) {
     await client.connect(transport);
 
     const toolsResult = await client.listTools();
-    const tools = toolsResult.tools.map((tool) => tool.name);
+    const toolDetails = toolsResult.tools.map((tool: ToolLike) => ({
+      name: tool.name,
+      description: tool.description ?? '',
+      inputKeys: extractInputKeysFromSchema(tool.inputSchema),
+      requiredKeys: extractRequiredKeysFromSchema(tool.inputSchema)
+    }));
+    const tools = toolDetails.map((tool) => tool.name);
 
     let resources: string[] = [];
     let prompts: string[] = [];
@@ -106,6 +151,7 @@ export async function POST(request: Request) {
       connected: true,
       serverName: payload.serverName,
       tools,
+      toolDetails,
       resources,
       prompts
     });
