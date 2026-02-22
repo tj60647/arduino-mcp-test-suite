@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm run dev:all",
+    "dev:all": "concurrently \"npm run web:dev\"",
     "build": "tsc -b tsconfig.json",
     "clean": "npm run -ws clean",
     "typecheck": "tsc -b tsconfig.json --pretty",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
+    "concurrently": "^9.2.1",
     "typescript": "^5.8.2"
   },
   "engines": {
