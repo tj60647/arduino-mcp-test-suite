@@ -9,7 +9,14 @@ import type { Capability, McpTransportConfig } from '@arduino-mcp/schemas';
 const TOOL_TO_CAPABILITY: Record<string, Capability> = {
   // canonical
   project_init: 'project_init',
+  file_read: 'file_read',
   file_write: 'file_write',
+  shell_exec: 'shell_exec',
+  http_request: 'http_request',
+  build: 'build',
+  run: 'run',
+  test: 'test',
+  device_io: 'device_io',
   compile: 'compile',
   upload: 'upload',
   simulate: 'simulate',
@@ -19,9 +26,15 @@ const TOOL_TO_CAPABILITY: Record<string, Capability> = {
   // dialect variants
   init_project: 'project_init',
   create_project: 'project_init',
+  read_file: 'file_read',
   write_file: 'file_write',
+  execute_shell: 'shell_exec',
+  http_fetch: 'http_request',
+  execute: 'run',
+  run_tests: 'test',
+  read_device: 'device_io',
+  write_device: 'device_io',
   arduino_compile: 'compile',
-  build: 'compile',
   arduino_upload: 'upload',
   flash: 'upload',
   install_library: 'dependency_install',
@@ -43,12 +56,16 @@ function makeDryRunSession(serverName: string): McpSession {
   return {
     serverName,
     availableCapabilities: new Set<Capability>([
+      'file_read',
       'project_init',
       'file_write',
-      'compile',
-      'simulate',
+      'shell_exec',
+      'http_request',
+      'build',
+      'run',
+      'test',
       'dependency_install',
-      'serial_read'
+      'device_io'
     ]),
     async callTool(_toolName: string, _parameters: Record<string, unknown>) {
       return { ok: true, dryRun: true };
@@ -66,7 +83,7 @@ async function makeLiveSession(
   transportConfig: McpTransportConfig
 ): Promise<McpSession> {
   const client = new Client(
-    { name: 'arduino-mcp-eval', version: '0.1.0' },
+    { name: 'mcp-agent-eval', version: '0.1.0' },
     { capabilities: {} }
   );
 

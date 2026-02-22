@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "0.1.0",
+  "benchmarkPack": "general",
+  "id": "101-letter-api-compose-send",
+  "title": "Letter API draft + send flow",
+  "category": "deterministic",
+  "difficulty": "medium",
+  "tags": ["api", "letters", "http", "workflow"],
+  "prompt": "Use the Letter API to create a draft letter and send it after validation. Assume endpoints /letters/draft and /letters/send with Bearer authentication.",
+  "context": {
+    "constraints": [
+      "Use Bearer auth for all API requests",
+      "Do not send until draft validation succeeds",
+      "Preserve a request/response log"
+    ],
+    "assumptionsAllowed": true
+  },
+  "requiredCapabilities": ["http_request", "file_write", "test"],
+  "objectiveChecks": [
+    {
+      "id": "cap-http-request",
+      "type": "requires_capability",
+      "value": "http_request",
+      "required": true,
+      "weight": 0.5
+    },
+    {
+      "id": "prompt-letter-endpoint",
+      "type": "requires_prompt_contains",
+      "value": "/letters/draft",
+      "required": true,
+      "weight": 0.25
+    },
+    {
+      "id": "prompt-auth",
+      "type": "requires_prompt_contains",
+      "value": "Bearer",
+      "required": true,
+      "weight": 0.25
+    }
+  ]
+}

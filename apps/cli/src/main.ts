@@ -2,8 +2,8 @@
 import { mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { Command } from 'commander';
-import { runSuite, writeReport } from '@arduino-mcp/runner';
-import type { McpTransportConfig } from '@arduino-mcp/schemas';
+import { getBenchmarkPackConfig, runSuite, writeReport } from '@arduino-mcp/runner';
+import type { BenchmarkPack, McpTransportConfig } from '@arduino-mcp/schemas';
 
 async function ingestReport(input: {
   ingestUrl: string;
@@ -69,11 +69,12 @@ const program = new Command();
 
 program
   .name('run-suite')
-  .description('Run Arduino MCP evaluation suite')
+  .description('Run MCP agent evaluation suite')
   .option('--suite <name>', 'suite name', 'pilot')
+  .option('--pack <name>', 'benchmark pack id (e.g., arduino, general)', 'arduino')
   .option('--server <name>', 'MCP server identifier', 'arduino-mcp-local')
   .option('--model <name>', 'model identifier', 'chatgpt-or-claude')
-  .option('--cases <path>', 'path to eval cases', 'cases/pilot')
+  .option('--cases <path>', 'path to eval cases (defaults to selected pack path)')
   .option('--out <path>', 'output report path', 'reports/run-report.json')
   .option('--team <name>', 'team label for shared dashboard', 'default')
   .option('--submitted-by <name>', 'person or runner label', 'local-user')
@@ -99,7 +100,9 @@ program
   .action(async (options) => {
     const workspaceRoot = process.env.INIT_CWD ?? process.cwd();
     const reportPath = resolve(workspaceRoot, options.out);
-    const casesPath = resolve(workspaceRoot, options.cases);
+    const benchmarkPack = options.pack as BenchmarkPack;
+    const defaultCasesPath = getBenchmarkPackConfig(benchmarkPack).defaultCasesPath;
+    const casesPath = resolve(workspaceRoot, options.cases ?? defaultCasesPath);
     mkdirSync(dirname(reportPath), { recursive: true });
 
     const mcpTransportConfig = buildTransportConfig({
@@ -112,6 +115,7 @@ program
 
     const report = await runSuite({
       suiteName: options.suite,
+      benchmarkPack,
       serverName: options.server,
       modelName: options.model,
       casesPath,

@@ -1,8 +1,10 @@
-# Eval Spec (MVP)
+# Eval Spec (MVP, Pack-Driven)
 
 ## 1) Case schema (conceptual)
 
 Each eval case should include:
+
+- `benchmarkPack`: benchmark domain pack (e.g., `arduino`, `general`)
 
 - `id`: stable case id
 - `title`: human-readable name
@@ -60,6 +62,8 @@ Score each criterion 0–4 and store rationale text.
 
 ## 4) First 10 benchmark cases
 
+This list reflects the Arduino reference pack. Additional packs (for example `general`) can define their own case sets.
+
 ## Deterministic (6)
 
 1. Blink with board-specific pin mapping
@@ -82,6 +86,12 @@ Score each criterion 0–4 and store rationale text.
 - No tool call with unknown capability alias
 - Generated code contains `setup()` and `loop()`
 - If case requires clarification: model asks at least one targeted question before final answer
+
+## 5.1) General pack starter examples
+
+- Letter API draft + send workflow (`/letters/draft`, `/letters/send`)
+- Calendar API event create + sync (`/calendar/events`, `/calendar/sync`)
+- Timezone ambiguity clarification for multi-region scheduling
 
 ## 6) Report format
 

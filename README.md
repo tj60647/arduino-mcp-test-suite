@@ -1,17 +1,20 @@
-# Arduino MCP Eval Suite (TypeScript)
+# MCP Agent Eval Suite (TypeScript)
 
-A test suite for evaluating Arduino-focused MCP servers with ChatGPT/Claude-style agent workflows.
+A test suite for evaluating MCP-enabled agent systems with mechanistic and epistemic scoring.
 
 ## Purpose
 
 This project evaluates two classes of behavior:
 
-1. **Task performance**: Can the model + MCP server complete Arduino prototyping tasks (tool calls, compile, simulate/upload workflows)?
+1. **Mechanistic performance**: Can the model + MCP server complete tasks correctly (tool calls, dependency recovery, compile/build/execute flow)?
 2. **Epistemic quality**: Does the model reason safely under uncertainty (ask clarifying questions, track constraints, avoid fabrication, defer when needed)?
+
+The repository currently ships with an **Arduino benchmark pack** as the first reference implementation.
+It now also includes a **general benchmark pack** with API-oriented scenarios (for example letter-writing and calendar apps).
 
 ## Why this exists
 
-Arduino MCP servers are emerging quickly and vary heavily in tool naming, capability depth, and safety defaults. This suite creates a repeatable, model-agnostic evaluation harness so educators and prototyping teams can compare:
+MCP server ecosystems vary heavily in tool naming, capability depth, and safety defaults. This suite creates a repeatable, model-agnostic evaluation harness so educators and prototyping teams can compare:
 
 - MCP server reliability
 - agent/model quality
@@ -66,6 +69,10 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 
 	`npm run run-suite:dry`
 
+4. Run the general API pack (letter + calendar examples):
+
+	`npm run run-suite:dry -- --pack general`
+
 4. Open the generated report:
 
 	`reports/run-report.json`
@@ -111,15 +118,22 @@ Switching to DB later means implementing that class and changing `createRunRepos
 ## Current CLI options
 
 - `--suite` suite name (default `pilot`)
+- `--pack` benchmark pack id (default `arduino`)
 - `--server` MCP server id label
 - `--model` model label for report metadata
-- `--cases` path to case JSON files (default `cases/pilot`)
+- `--cases` path to case JSON files (defaults to selected pack path)
 - `--out` output path (default `reports/run-report.json`)
 - `--team` team label used by web dashboard
 - `--submitted-by` who submitted the run
 - `--ingest-url` POST endpoint to publish report
 - `--ingest-key` bearer token for ingest endpoint
 - `--dry-run` runs against the current stub MCP adapter
+
+## Starter general API scenarios
+
+- `101-letter-api-compose-send`: letter draft + send workflow with Bearer auth checks
+- `102-calendar-api-event-sync`: calendar create + sync with retry/idempotency checks
+- `103-calendar-timezone-ambiguity`: epistemic clarification case for timezone ambiguity
 
 ## Note on Vercel persistence
 

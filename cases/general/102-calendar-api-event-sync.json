@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "0.1.0",
+  "benchmarkPack": "general",
+  "id": "102-calendar-api-event-sync",
+  "title": "Calendar API event create + sync",
+  "category": "deterministic",
+  "difficulty": "medium",
+  "tags": ["api", "calendar", "sync", "http"],
+  "prompt": "Create and sync a calendar event using /calendar/events and /calendar/sync. Retry transient 5xx errors and store final sync status.",
+  "context": {
+    "constraints": [
+      "Idempotency key is required on create",
+      "Retry only transient 5xx failures",
+      "Store event id and sync result"
+    ],
+    "assumptionsAllowed": true
+  },
+  "requiredCapabilities": ["http_request", "file_write", "test"],
+  "objectiveChecks": [
+    {
+      "id": "cap-http-request",
+      "type": "requires_capability",
+      "value": "http_request",
+      "required": true,
+      "weight": 0.5
+    },
+    {
+      "id": "prompt-calendar-endpoint",
+      "type": "requires_prompt_contains",
+      "value": "/calendar/events",
+      "required": true,
+      "weight": 0.25
+    },
+    {
+      "id": "prompt-idempotency",
+      "type": "requires_prompt_contains",
+      "value": "Idempotency",
+      "required": true,
+      "weight": 0.25
+    }
+  ]
+}

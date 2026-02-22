@@ -9,6 +9,7 @@ import {
 } from '@arduino-mcp/schemas';
 import { connectMcp } from './mcpClient.js';
 import type { CaseResult, RunReport } from './types.js';
+import { getBenchmarkPackConfig } from './packs.js';
 
 function now(): string {
   return new Date().toISOString();
@@ -21,6 +22,19 @@ function loadCases(casesPath: string): EvalCase[] {
     const parsed = JSON.parse(readFileSync(fullPath, 'utf8'));
     return evalCaseSchema.parse(parsed);
   });
+}
+
+function normalizeCapabilities(
+  availableCapabilities: Set<string>,
+  aliasMap: Record<string, string>
+): Set<string> {
+  const normalized = new Set<string>(availableCapabilities);
+  for (const [from, to] of Object.entries(aliasMap)) {
+    if (availableCapabilities.has(from)) {
+      normalized.add(to);
+    }
+  }
+  return normalized;
 }
 
 function scoreCase(evalCase: EvalCase, availableCapabilities: Set<string>): CaseResult {
@@ -97,6 +111,7 @@ function scoreCase(evalCase: EvalCase, availableCapabilities: Set<string>): Case
 export async function runSuite(input: RunConfig): Promise<RunReport> {
   const config = runConfigSchema.parse(input);
   const startedAt = now();
+  const packConfig = getBenchmarkPackConfig(config.benchmarkPack);
 
   const session = await connectMcp(
     config.serverName,
@@ -104,9 +119,15 @@ export async function runSuite(input: RunConfig): Promise<RunReport> {
     config.mcpTransportConfig
   );
 
-  const cases = loadCases(config.casesPath);
+  const cases = loadCases(config.casesPath).filter(
+    (evalCase) => evalCase.benchmarkPack === config.benchmarkPack
+  );
+  const normalizedCapabilities = normalizeCapabilities(
+    session.availableCapabilities,
+    packConfig.capabilityAliases
+  );
   const caseResults = cases.map((evalCase) =>
-    scoreCase(evalCase, session.availableCapabilities)
+    scoreCase(evalCase, normalizedCapabilities)
   );
 
   await session.close();
@@ -115,9 +136,13 @@ export async function runSuite(input: RunConfig): Promise<RunReport> {
   const failed = caseResults.length - passed;
 
   const deterministicScore =
-    caseResults.reduce((acc, r) => acc + r.deterministicScore, 0) / caseResults.length;
+    caseResults.length > 0
+      ? caseResults.reduce((acc, r) => acc + r.deterministicScore, 0) / caseResults.length
+      : 0;
   const epistemicScore =
-    caseResults.reduce((acc, r) => acc + r.epistemicScore, 0) / caseResults.length;
+    caseResults.length > 0
+      ? caseResults.reduce((acc, r) => acc + r.epistemicScore, 0) / caseResults.length
+      : 0;
   const score =
     deterministicScore * config.deterministicWeight +
     epistemicScore * (1 - config.deterministicWeight);
@@ -125,6 +150,7 @@ export async function runSuite(input: RunConfig): Promise<RunReport> {
   return {
     runId: `${startedAt}_${config.suiteName}`,
     suiteName: config.suiteName,
+    benchmarkPack: config.benchmarkPack,
     server: session.serverName,
     model: config.modelName,
     startedAt,

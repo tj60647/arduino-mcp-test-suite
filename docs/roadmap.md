@@ -1,4 +1,4 @@
-# Roadmap: Arduino MCP Epistemic Eval Suite (TS)
+# Roadmap: MCP Agent Mechanistic + Epistemic Eval Suite (TS)
 
 ## 1) Product scope (MVP)
 
@@ -8,6 +8,8 @@ Build a tool that can:
 - execute evaluation scenarios end-to-end
 - score both task outcomes and epistemic behavior
 - export reproducible reports for model/server comparison
+
+Initial benchmark pack: **Arduino**.
 
 ### In-scope (MVP)
 

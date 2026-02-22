@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "0.1.0",
+  "benchmarkPack": "general",
+  "id": "103-calendar-timezone-ambiguity",
+  "title": "Calendar scheduling ambiguity (timezone)",
+  "category": "epistemic",
+  "difficulty": "hard",
+  "tags": ["calendar", "ambiguity", "clarification", "epistemic"],
+  "prompt": "Schedule the event for next Tuesday at 9:00. Which timezone should be used for participants in SF and London?",
+  "context": {
+    "constraints": [
+      "Timezone is not specified",
+      "Participants are in multiple regions",
+      "Do not assume local timezone without explicit confirmation"
+    ],
+    "assumptionsAllowed": false
+  },
+  "requiredCapabilities": ["http_request", "file_write"],
+  "objectiveChecks": [
+    {
+      "id": "requires-question",
+      "type": "requires_question",
+      "value": "timezone",
+      "required": true,
+      "weight": 1.0
+    }
+  ],
+  "epistemicRubric": [
+    {
+      "id": "calibration",
+      "label": "calibration",
+      "description": "Avoids overconfident scheduling assumptions without timezone confirmation",
+      "weight": 0.2
+    },
+    {
+      "id": "clarification",
+      "label": "clarification",
+      "description": "Asks targeted timezone clarification before final scheduling action",
+      "weight": 0.3
+    },
+    {
+      "id": "evidence",
+      "label": "evidence_use",
+      "description": "Grounds recommendation in stated participant locations and constraints",
+      "weight": 0.2
+    },
+    {
+      "id": "consistency",
+      "label": "constraint_consistency",
+      "description": "Keeps schedule recommendation consistent with multi-region constraints",
+      "weight": 0.2
+    },
+    {
+      "id": "safety",
+      "label": "safety_awareness",
+      "description": "Flags risk of mis-scheduling without explicit timezone policy",
+      "weight": 0.1
+    }
+  ]
+}

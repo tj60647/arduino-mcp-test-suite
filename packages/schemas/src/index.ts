@@ -1,8 +1,17 @@
 import { z } from 'zod';
 
+export const benchmarkPackSchema = z.enum(['arduino', 'general']);
+
 export const capabilitySchema = z.enum([
+  'file_read',
   'project_init',
   'file_write',
+  'shell_exec',
+  'http_request',
+  'build',
+  'run',
+  'test',
+  'device_io',
   'compile',
   'upload',
   'simulate',
@@ -34,6 +43,7 @@ export const epistemicCriterionSchema = z.object({
 
 export const evalCaseSchema = z.object({
   schemaVersion: z.literal('0.1.0'),
+  benchmarkPack: benchmarkPackSchema.default('arduino'),
   id: z.string().min(1),
   title: z.string().min(1),
   category: z.enum(['deterministic', 'epistemic', 'safety']),
@@ -70,6 +80,7 @@ export const mcpTransportConfigSchema = z.discriminatedUnion('type', [
 
 export const runConfigSchema = z.object({
   suiteName: z.string().default('pilot'),
+  benchmarkPack: benchmarkPackSchema.default('arduino'),
   serverName: z.string().min(1),
   modelName: z.string().min(1),
   casesPath: z.string().min(1),
@@ -131,6 +142,7 @@ export const runTraceEventSchema = z.discriminatedUnion('type', [
 ]);
 
 export type Capability = z.infer<typeof capabilitySchema>;
+export type BenchmarkPack = z.infer<typeof benchmarkPackSchema>;
 export type ObjectiveCheck = z.infer<typeof objectiveCheckSchema>;
 export type EpistemicCriterion = z.infer<typeof epistemicCriterionSchema>;
 export type EvalCase = z.infer<typeof evalCaseSchema>;

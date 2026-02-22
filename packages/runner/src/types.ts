@@ -22,6 +22,7 @@ export interface RunSummary {
 export interface RunReport {
   runId: string;
   suiteName: string;
+  benchmarkPack: string;
   server: string;
   model: string;
   startedAt: string;
