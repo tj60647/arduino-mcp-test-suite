@@ -77,6 +77,7 @@ export default function HomePage() {
   const [endpointUrlOrCommand, setEndpointUrlOrCommand] = useState('');
   const [endpointAuthEnvVar, setEndpointAuthEnvVar] = useState('');
   const [endpointNotes, setEndpointNotes] = useState('');
+  const [denseMode, setDenseMode] = useState(false);
   const [jobs, setJobs] = useState<EvalJob[]>([]);
   const [workers, setWorkers] = useState<WorkerInfo[]>([]);
   const [registeredWorkers, setRegisteredWorkers] = useState<RegisteredWorker[]>([]);
@@ -112,6 +113,30 @@ export default function HomePage() {
     void refreshJobs();
     void refreshWorkers();
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem('mcp-ui-density-mode');
+      if (stored === 'dense') {
+        setDenseMode(true);
+      }
+    } catch {
+      // ignore storage read issues
+    }
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle('density-dense', denseMode);
+    try {
+      window.localStorage.setItem('mcp-ui-density-mode', denseMode ? 'dense' : 'comfortable');
+    } catch {
+      // ignore storage write issues
+    }
+
+    return () => {
+      document.body.classList.remove('density-dense');
+    };
+  }, [denseMode]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -549,6 +574,15 @@ export default function HomePage() {
       {/* ── Hero ──────────────────────────────────────────────────────── */}
       <div className="hero">
         <div className="hero-badge">MCP Agent Eval Suite</div>
+        <div className="toolbar" style={{ marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => setDenseMode((current) => !current)}
+            style={{ marginLeft: 'auto' }}
+          >
+            {denseMode ? 'Comfortable mode' : 'High-density mode'}
+          </button>
+        </div>
         <h1>Does your MCP server handle agent tasks correctly?</h1>
         <p className="hero-sub">
           Run a standardized benchmark suite against any MCP server and get scores for mechanistic

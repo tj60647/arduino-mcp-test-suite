@@ -12,9 +12,9 @@ body {
 }
 
 main {
-  max-width: 1100px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 32px 24px 64px;
+  padding: 24px 28px 40px;
 }
 
 /* ── Base elements ──────────────────────────────────────────────── */
@@ -83,9 +83,9 @@ select:focus {
 .hero {
   background: linear-gradient(135deg, #1e3a5f 0%, #0369a1 100%);
   color: #ffffff;
-  padding: 52px 40px;
+  padding: 34px 32px;
   border-radius: 14px;
-  margin-bottom: 36px;
+  margin-bottom: 24px;
 }
 
 .hero-badge {
@@ -102,17 +102,17 @@ select:focus {
 }
 
 .hero h1 {
-  font-size: 2rem;
+  font-size: 1.85rem;
   color: #ffffff;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .hero-sub {
   color: #bae6fd;
-  font-size: 1rem;
-  max-width: 680px;
+  font-size: 0.96rem;
+  max-width: 900px;
   margin: 0;
-  line-height: 1.65;
+  line-height: 1.55;
 }
 
 /* ── How it works — 3-step overview ───────────────────────────── */
@@ -120,15 +120,15 @@ select:focus {
 .workflow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 36px;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .workflow-step {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 24px 20px;
+  padding: 18px 16px;
 }
 
 .workflow-step p {
@@ -152,7 +152,7 @@ select:focus {
   border-radius: 50%;
   font-weight: 700;
   font-size: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .step-number.small {
@@ -169,15 +169,15 @@ select:focus {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 32px;
-  margin-bottom: 28px;
+  padding: 22px;
+  margin-bottom: 18px;
 }
 
 .section-desc {
   color: #64748b;
   font-size: 13.5px;
   margin-top: 6px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 /* ── Form layout ───────────────────────────────────────────────── */
@@ -185,8 +185,8 @@ select:focus {
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .form-field {
@@ -206,8 +206,8 @@ select:focus {
 }
 
 .queue-panel {
-  margin-top: 24px;
-  padding-top: 14px;
+  margin-top: 16px;
+  padding-top: 10px;
   border-top: 1px dashed #cbd5e1;
 }
 
@@ -285,7 +285,7 @@ button:disabled {
 .toolbar {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
@@ -354,8 +354,8 @@ button:disabled {
 .stats-row {
   display: flex;
   gap: 32px;
-  margin-bottom: 20px;
-  padding: 16px 20px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -473,8 +473,8 @@ th,
 td {
   border-bottom: 1px solid #e2e8f0;
   text-align: left;
-  padding: 11px 14px;
-  font-size: 13.5px;
+  padding: 9px 11px;
+  font-size: 13px;
 }
 
 th {
@@ -493,4 +493,114 @@ tr:last-child td {
 .code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12.5px;
+}
+
+@media (max-width: 1200px) {
+  main {
+    max-width: 1200px;
+    padding: 20px 20px 32px;
+  }
+
+  .workflow {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  main {
+    padding: 14px 12px 24px;
+  }
+
+  .hero {
+    padding: 22px 16px;
+  }
+
+  .section-card {
+    padding: 14px;
+  }
+
+  .toolbar {
+    gap: 6px;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+body.density-dense main {
+  padding-top: 16px;
+  padding-bottom: 24px;
+}
+
+body.density-dense .hero {
+  padding: 22px 22px;
+  margin-bottom: 16px;
+}
+
+body.density-dense .hero h1 {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+body.density-dense .hero-sub {
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+body.density-dense .workflow {
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+body.density-dense .workflow-step {
+  padding: 12px 12px;
+}
+
+body.density-dense .section-card {
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+body.density-dense .section-desc {
+  margin-bottom: 10px;
+}
+
+body.density-dense .form-row {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+body.density-dense input,
+body.density-dense select {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+body.density-dense button,
+body.density-dense .upload-label {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+body.density-dense th,
+body.density-dense td {
+  padding: 7px 9px;
+  font-size: 12.5px;
+}
+
+body.density-dense .toolbar {
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+body.density-dense .stats-row {
+  padding: 8px 10px;
+  margin-bottom: 10px;
 }
