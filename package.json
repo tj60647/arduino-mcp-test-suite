@@ -13,6 +13,7 @@
     "typecheck": "tsc -b tsconfig.json --pretty",
     "run-suite": "npm run --workspace @mcp-agent-eval/cli run-suite",
     "run-suite:dry": "npm run --workspace @mcp-agent-eval/cli run-suite -- --dry-run",
+    "run-worker": "npm run --workspace @mcp-agent-eval/cli run-worker",
     "web:dev": "npm run --workspace @mcp-agent-eval/web dev",
     "web:build": "npm run --workspace @mcp-agent-eval/web build"
   },

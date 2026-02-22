@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
-import { addRun, listRuns } from '@/lib/store';
 import { checkAuthHeader } from '@/lib/apiAuth';
-import { ingestPayloadSchema } from '@/lib/validation';
-
-export async function GET() {
-  const runs = await listRuns();
-  return NextResponse.json({ runs });
-}
+import { claimNextQueuedJob } from '@/lib/jobStore';
+import { claimJobSchema } from '@/lib/jobValidation';
 
 export async function POST(request: Request) {
   if (!checkAuthHeader(request.headers.get('authorization'))) {
@@ -14,8 +9,7 @@ export async function POST(request: Request) {
   }
 
   const payload = await request.json();
-  const parsed = ingestPayloadSchema.safeParse(payload);
-
+  const parsed = claimJobSchema.safeParse(payload);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid payload', details: parsed.error.flatten() },
@@ -23,6 +17,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const stored = await addRun(parsed.data);
-  return NextResponse.json({ id: stored.id, createdAt: stored.createdAt }, { status: 201 });
+  const job = await claimNextQueuedJob(parsed.data.workerId);
+  if (!job) {
+    return new NextResponse(null, { status: 204 });
+  }
+
+  return NextResponse.json({ job });
 }

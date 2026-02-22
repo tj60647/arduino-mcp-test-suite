@@ -115,6 +115,43 @@ Endpoint profiles are currently stored in browser localStorage and are per-brows
 The repository abstraction and DB stub are in [apps/web/lib/runRepository.ts](apps/web/lib/runRepository.ts) (`DatabaseRunRepository`).
 Switching to DB later means implementing that class and changing `createRunRepository('database')`.
 
+## Job queue + worker execution
+
+You can run suites through a control-plane job queue and a worker process.
+
+1. Start the web control plane:
+
+	`npm run web:dev`
+
+2. Start a worker:
+
+	`npm run run-worker -- --control-plane http://localhost:3000`
+
+3. Create a dry-run job:
+
+```bash
+curl -X POST http://localhost:3000/api/jobs \
+	-H "content-type: application/json" \
+	-d '{
+		"team": "prototyping-lab",
+		"submittedBy": "alice",
+		"config": {
+			"suiteName": "pilot",
+			"benchmarkPack": "arduino",
+			"serverName": "mcp-local",
+			"modelName": "claude-sonnet",
+			"dryRun": true,
+			"deterministicWeight": 0.7
+		}
+	}'
+```
+
+4. Track the job:
+
+	`curl http://localhost:3000/api/jobs/<job-id>`
+
+Completed jobs automatically persist their report to the runs store (`/api/runs`).
+
 ## Current CLI options
 
 - `--suite` suite name (default `pilot`)
@@ -128,6 +165,18 @@ Switching to DB later means implementing that class and changing `createRunRepos
 - `--ingest-url` POST endpoint to publish report
 - `--ingest-key` bearer token for ingest endpoint
 - `--dry-run` runs against the current stub MCP adapter
+- `--transport` MCP transport (`stdio`, `sse`, `streamable-http`)
+- `--mcp-command` stdio server command
+- `--mcp-args` stdio server command args
+- `--mcp-url` MCP server URL for `sse`/`streamable-http`
+
+## Worker CLI options
+
+- `--control-plane` control plane base URL
+- `--api-key` bearer token (or set `INGEST_API_KEY`)
+- `--poll-interval-ms` queue poll interval in milliseconds
+- `--worker-id` worker identity label
+- `--once` process one job then exit
 
 ## Starter general API scenarios
 

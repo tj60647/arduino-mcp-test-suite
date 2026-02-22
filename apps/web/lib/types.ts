@@ -45,3 +45,47 @@ export interface McpEndpoint {
   notes?: string;
   createdAt: string;
 }
+
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface JobConfig {
+  suiteName: string;
+  benchmarkPack: 'arduino' | 'general';
+  serverName: string;
+  modelName: string;
+  casesPath?: string;
+  dryRun: boolean;
+  deterministicWeight: number;
+  mcpTransportConfig?:
+    | {
+        type: 'stdio';
+        command: string;
+        args: string[];
+      }
+    | {
+        type: 'sse' | 'streamable-http';
+        url: string;
+      };
+}
+
+export interface JobEvent {
+  at: string;
+  level: 'info' | 'warning' | 'error';
+  message: string;
+}
+
+export interface EvalJob {
+  id: string;
+  status: JobStatus;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  team: string;
+  submittedBy: string;
+  workerId?: string;
+  errorMessage?: string;
+  config: JobConfig;
+  events: JobEvent[];
+  reportId?: string;
+}

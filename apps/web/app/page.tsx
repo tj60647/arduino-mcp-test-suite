@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { addEndpoint, deleteEndpoint, listEndpoints } from '@/lib/endpointRepository';
 import { createRunRepository } from '@/lib/runRepository';
-import type { McpEndpoint, StoredRun } from '@/lib/types';
+import type { EvalJob, McpEndpoint, StoredRun } from '@/lib/types';
 
 const repository = createRunRepository('local');
 
@@ -25,6 +25,22 @@ function transportLabel(transport: McpEndpoint['transport']): string {
   return 'HTTP';
 }
 
+function parseStdioCommand(input: string): { command: string; args: string[] } {
+  const parts = input
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part.length > 0);
+
+  const [command = '', ...args] = parts;
+  return { command, args };
+}
+
+function statusBadgeClass(status: EvalJob['status']): string {
+  if (status === 'completed') return 'badge-pass';
+  if (status === 'failed') return 'badge-fail';
+  return 'badge-neutral';
+}
+
 export default function HomePage() {
   const [runs, setRuns] = useState<StoredRun[]>([]);
   const [endpoints, setEndpoints] = useState<McpEndpoint[]>([]);
@@ -36,6 +52,18 @@ export default function HomePage() {
   const [endpointUrlOrCommand, setEndpointUrlOrCommand] = useState('');
   const [endpointAuthEnvVar, setEndpointAuthEnvVar] = useState('');
   const [endpointNotes, setEndpointNotes] = useState('');
+  const [jobs, setJobs] = useState<EvalJob[]>([]);
+  const [isJobBusy, setIsJobBusy] = useState(false);
+  const [jobEndpointId, setJobEndpointId] = useState('');
+  const [jobServerName, setJobServerName] = useState('mcp-local');
+  const [jobTransport, setJobTransport] = useState<McpEndpoint['transport']>('sse');
+  const [jobUrlOrCommand, setJobUrlOrCommand] = useState('');
+  const [jobModelName, setJobModelName] = useState('claude-sonnet');
+  const [jobSuiteName, setJobSuiteName] = useState('pilot');
+  const [jobBenchmarkPack, setJobBenchmarkPack] = useState<'arduino' | 'general'>('arduino');
+  const [jobTeam, setJobTeam] = useState('default');
+  const [jobSubmittedBy, setJobSubmittedBy] = useState('local-user');
+  const [jobDryRun, setJobDryRun] = useState(true);
 
   const totals = useMemo(() => {
     const count = runs.length;
@@ -49,16 +77,60 @@ export default function HomePage() {
   useEffect(() => {
     void refreshRuns();
     void refreshEndpoints();
+    void refreshJobs();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refreshJobs();
+      void refreshRuns();
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
   }, []);
 
   async function refreshRuns(): Promise<void> {
-    const items = await repository.listRuns();
-    setRuns(items);
+    const localRuns = await repository.listRuns();
+    try {
+      const response = await fetch('/api/runs', { cache: 'no-store' });
+      if (!response.ok) {
+        setRuns(localRuns);
+        return;
+      }
+
+      const payload = (await response.json()) as { runs: StoredRun[] };
+      const deduped = new Map<string, StoredRun>();
+
+      for (const item of payload.runs) {
+        deduped.set(item.id, item);
+      }
+      for (const item of localRuns) {
+        deduped.set(item.id, item);
+      }
+
+      const merged = [...deduped.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setRuns(merged);
+    } catch {
+      setRuns(localRuns);
+    }
   }
 
   async function refreshEndpoints(): Promise<void> {
     const items = await listEndpoints();
     setEndpoints(items);
+  }
+
+  async function refreshJobs(): Promise<void> {
+    try {
+      const response = await fetch('/api/jobs', { cache: 'no-store' });
+      if (!response.ok) {
+        return;
+      }
+      const payload = (await response.json()) as { jobs: EvalJob[] };
+      setJobs(payload.jobs);
+    } catch {
+      // ignore temporary fetch failures during polling
+    }
   }
 
   async function handleCreateEndpoint(): Promise<void> {
@@ -139,6 +211,108 @@ export default function HomePage() {
     } finally {
       event.target.value = '';
       setIsBusy(false);
+    }
+  }
+
+  function handleSelectJobEndpoint(id: string): void {
+    setJobEndpointId(id);
+    if (!id) {
+      return;
+    }
+
+    const endpoint = endpoints.find((item) => item.id === id);
+    if (!endpoint) {
+      return;
+    }
+
+    setJobServerName(endpoint.name);
+    setJobTransport(endpoint.transport);
+    setJobUrlOrCommand(endpoint.urlOrCommand);
+    setJobDryRun(false);
+  }
+
+  async function handleCreateJob(): Promise<void> {
+    if (!jobServerName.trim()) {
+      setMessage('Server name is required to queue a job.');
+      return;
+    }
+
+    if (!jobDryRun && !jobUrlOrCommand.trim()) {
+      setMessage('URL / command is required unless dry-run is enabled.');
+      return;
+    }
+
+    setIsJobBusy(true);
+    setMessage('');
+
+    try {
+      const payload: {
+        team: string;
+        submittedBy: string;
+        config: {
+          suiteName: string;
+          benchmarkPack: 'arduino' | 'general';
+          serverName: string;
+          modelName: string;
+          dryRun: boolean;
+          deterministicWeight: number;
+          mcpTransportConfig?:
+            | { type: 'stdio'; command: string; args: string[] }
+            | { type: 'sse' | 'streamable-http'; url: string };
+        };
+      } = {
+        team: jobTeam.trim() || 'default',
+        submittedBy: jobSubmittedBy.trim() || 'local-user',
+        config: {
+          suiteName: jobSuiteName.trim() || 'pilot',
+          benchmarkPack: jobBenchmarkPack,
+          serverName: jobServerName.trim(),
+          modelName: jobModelName.trim() || 'claude-sonnet',
+          dryRun: jobDryRun,
+          deterministicWeight: 0.7
+        }
+      };
+
+      if (!jobDryRun) {
+        if (jobTransport === 'stdio') {
+          const parsed = parseStdioCommand(jobUrlOrCommand);
+          if (!parsed.command) {
+            setMessage('For stdio transport, enter a launch command.');
+            setIsJobBusy(false);
+            return;
+          }
+
+          payload.config.mcpTransportConfig = {
+            type: 'stdio',
+            command: parsed.command,
+            args: parsed.args
+          };
+        } else {
+          payload.config.mcpTransportConfig = {
+            type: jobTransport,
+            url: jobUrlOrCommand.trim()
+          };
+        }
+      }
+
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const failure = await response.text();
+        throw new Error(`Job creation failed (${response.status}): ${failure}`);
+      }
+
+      const created = (await response.json()) as { id: string };
+      await refreshJobs();
+      setMessage(`Job queued: ${created.id}`);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsJobBusy(false);
     }
   }
 
@@ -380,6 +554,195 @@ export default function HomePage() {
           Add <code>--ingest-url http://localhost:3000/api/runs</code> to push results directly
           to this dashboard instead of importing the JSON manually.
         </p>
+
+        <div className="queue-panel">
+          <p className="cmd-label" style={{ marginTop: 20 }}>
+            Queue runs directly from web (worker must be running):
+          </p>
+
+          <div className="form-row" style={{ marginTop: 10 }}>
+            <div className="form-field">
+              <label htmlFor="job-endpoint-select">Use registered endpoint (optional)</label>
+              <select
+                id="job-endpoint-select"
+                value={jobEndpointId}
+                onChange={(e) => handleSelectJobEndpoint(e.target.value)}
+                disabled={isBusy || isJobBusy}
+              >
+                <option value="">Custom endpoint</option>
+                {endpoints.map((ep) => (
+                  <option key={ep.id} value={ep.id}>
+                    {ep.name} ({transportLabel(ep.transport)})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-field">
+              <label htmlFor="job-server-name">Server label</label>
+              <input
+                id="job-server-name"
+                type="text"
+                value={jobServerName}
+                onChange={(e) => setJobServerName(e.target.value)}
+                disabled={isBusy || isJobBusy}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="job-transport">Connection type</label>
+              <select
+                id="job-transport"
+                value={jobTransport}
+                onChange={(e) => setJobTransport(e.target.value as McpEndpoint['transport'])}
+                disabled={isBusy || isJobBusy || jobDryRun}
+              >
+                <option value="sse">SSE</option>
+                <option value="streamable-http">Streamable HTTP</option>
+                <option value="stdio">stdio</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label htmlFor="job-url-command">
+                {jobTransport === 'stdio' ? 'Launch command' : 'Server URL'}
+              </label>
+              <input
+                id="job-url-command"
+                type="text"
+                value={jobUrlOrCommand}
+                onChange={(e) => setJobUrlOrCommand(e.target.value)}
+                placeholder={urlOrCommandPlaceholder(jobTransport)}
+                disabled={isBusy || isJobBusy || jobDryRun}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="job-pack">Benchmark pack</label>
+              <select
+                id="job-pack"
+                value={jobBenchmarkPack}
+                onChange={(e) => setJobBenchmarkPack(e.target.value as 'arduino' | 'general')}
+                disabled={isBusy || isJobBusy}
+              >
+                <option value="arduino">arduino</option>
+                <option value="general">general</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label htmlFor="job-suite">Suite name</label>
+              <input
+                id="job-suite"
+                type="text"
+                value={jobSuiteName}
+                onChange={(e) => setJobSuiteName(e.target.value)}
+                disabled={isBusy || isJobBusy}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="job-model">Model label</label>
+              <input
+                id="job-model"
+                type="text"
+                value={jobModelName}
+                onChange={(e) => setJobModelName(e.target.value)}
+                disabled={isBusy || isJobBusy}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="job-team">Team</label>
+              <input
+                id="job-team"
+                type="text"
+                value={jobTeam}
+                onChange={(e) => setJobTeam(e.target.value)}
+                disabled={isBusy || isJobBusy}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="job-submitted-by">Submitted by</label>
+              <input
+                id="job-submitted-by"
+                type="text"
+                value={jobSubmittedBy}
+                onChange={(e) => setJobSubmittedBy(e.target.value)}
+                disabled={isBusy || isJobBusy}
+              />
+            </div>
+            <div className="form-field checkbox-field">
+              <label className="checkbox-label" htmlFor="job-dry-run">
+                <input
+                  id="job-dry-run"
+                  type="checkbox"
+                  checked={jobDryRun}
+                  onChange={(e) => setJobDryRun(e.target.checked)}
+                  disabled={isBusy || isJobBusy}
+                />
+                Dry run (no live MCP connection)
+              </label>
+              <p className="help-text" style={{ marginTop: 6 }}>
+                When disabled, a running worker will connect using the selected transport.
+              </p>
+            </div>
+          </div>
+
+          <div className="toolbar">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void handleCreateJob()}
+              disabled={isBusy || isJobBusy}
+            >
+              Queue run
+            </button>
+            <button type="button" onClick={() => void refreshJobs()} disabled={isBusy || isJobBusy}>
+              Refresh jobs
+            </button>
+          </div>
+
+          <table style={{ marginTop: 14 }}>
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Server</th>
+                <th>Pack</th>
+                <th>Status</th>
+                <th>Worker</th>
+                <th>Latest event</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="empty-cell">
+                    No queued jobs yet.
+                  </td>
+                </tr>
+              ) : (
+                jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td>{new Date(job.createdAt).toLocaleString()}</td>
+                    <td>{job.config.serverName}</td>
+                    <td>{job.config.benchmarkPack}</td>
+                    <td>
+                      <span className={statusBadgeClass(job.status)}>{job.status}</span>
+                    </td>
+                    <td>{job.workerId ?? '—'}</td>
+                    <td>{job.events[job.events.length - 1]?.message ?? '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ── Step 3: Results ───────────────────────────────────────────── */}

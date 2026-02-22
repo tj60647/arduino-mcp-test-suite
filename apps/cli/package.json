@@ -4,13 +4,15 @@
   "description": "CLI runner for mechanistic and epistemic MCP agent evaluations",
   "type": "module",
   "bin": {
-    "run-suite": "dist/main.js"
+    "run-suite": "dist/main.js",
+    "run-worker": "dist/worker.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\"",
-    "run-suite": "node dist/main.js"
+    "run-suite": "node dist/main.js",
+    "run-worker": "node dist/worker.js"
   },
   "dependencies": {
     "@mcp-agent-eval/runner": "0.1.0",
