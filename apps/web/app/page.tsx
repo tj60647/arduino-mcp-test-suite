@@ -108,6 +108,10 @@ export default function HomePage() {
   const [jobTeam, setJobTeam] = useState('default');
   const [jobSubmittedBy, setJobSubmittedBy] = useState('local-user');
   const [jobDryRun, setJobDryRun] = useState(true);
+  const [singleInputText, setSingleInputText] = useState('');
+  const [singleInputResult, setSingleInputResult] = useState('');
+  const [singleInputTool, setSingleInputTool] = useState('');
+  const [isSingleInputBusy, setIsSingleInputBusy] = useState(false);
   const [showAdvancedJobOptions, setShowAdvancedJobOptions] = useState(false);
   const [showWorkerSetup, setShowWorkerSetup] = useState(false);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
@@ -578,6 +582,89 @@ export default function HomePage() {
     };
   }
 
+  function buildLiveTransportConfigFromCurrentSelection():
+    | { type: 'stdio'; command: string; args: string[] }
+    | { type: 'sse' | 'streamable-http'; url: string } {
+    const selectedEndpoint = endpoints.find((item) => item.id === jobEndpointId);
+    const effectiveTransport = selectedEndpoint?.transport ?? jobTransport;
+    const effectiveUrlOrCommand = selectedEndpoint?.urlOrCommand ?? jobUrlOrCommand;
+
+    if (!effectiveUrlOrCommand.trim()) {
+      throw new Error('Select an endpoint first.');
+    }
+
+    if (effectiveTransport === 'stdio') {
+      const parsed = parseStdioCommand(effectiveUrlOrCommand);
+      if (!parsed.command) {
+        throw new Error('For stdio transport, enter a launch command.');
+      }
+
+      return {
+        type: 'stdio',
+        command: parsed.command,
+        args: parsed.args
+      };
+    }
+
+    return {
+      type: effectiveTransport,
+      url: effectiveUrlOrCommand.trim()
+    };
+  }
+
+  async function handleRunSingleInputTest(): Promise<void> {
+    const input = singleInputText.trim();
+    if (!input) {
+      setMessage('Enter input text first.');
+      return;
+    }
+
+    setIsSingleInputBusy(true);
+    setMessage('');
+    setSingleInputTool('');
+
+    try {
+      const selectedEndpoint = endpoints.find((item) => item.id === jobEndpointId);
+      const serverName = (selectedEndpoint?.name ?? jobServerName).trim() || 'mcp-endpoint';
+      const transportConfig = buildLiveTransportConfigFromCurrentSelection();
+
+      const response = await fetch('/api/input-test', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          serverName,
+          input,
+          mcpTransportConfig: transportConfig
+        })
+      });
+
+      const payload = (await response.json()) as {
+        connected?: boolean;
+        toolUsed?: string;
+        result?: unknown;
+        availableTools?: string[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        const detail = payload.error ?? `Input test failed (${response.status})`;
+        const toolList = payload.availableTools && payload.availableTools.length > 0
+          ? ` Available tools: ${payload.availableTools.join(', ')}`
+          : '';
+        throw new Error(`${detail}${toolList}`);
+      }
+
+      setSingleInputTool(payload.toolUsed ?? 'unknown');
+      setSingleInputResult(JSON.stringify(payload.result ?? payload, null, 2));
+      setMessage(`Connected and ran tool: ${payload.toolUsed ?? 'unknown'}`);
+    } catch (error) {
+      setSingleInputResult('');
+      setMessage((error as Error).message);
+    } finally {
+      setIsSingleInputBusy(false);
+    }
+  }
+
   async function queueJob(mode: 'quick' | 'advanced'): Promise<void> {
     const selectedEndpoint = endpoints.find((item) => item.id === jobEndpointId);
 
@@ -625,6 +712,38 @@ export default function HomePage() {
       const transportConfig = buildTransportConfigFromCurrentSelection();
       if (transportConfig) {
         payload.config.mcpTransportConfig = transportConfig;
+      }
+
+      if (mode === 'quick' && onlineWorkerCount === 0) {
+        const quickRunResponse = await fetch('/api/quick-run', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!quickRunResponse.ok) {
+          const failure = await quickRunResponse.text();
+          throw new Error(`Quick run failed (${quickRunResponse.status}): ${failure}`);
+        }
+
+        const quickResult = (await quickRunResponse.json()) as {
+          runId: string;
+          summary?: { score?: number };
+          connectivity?:
+            | { mode: 'dry-run' }
+            | { mode: 'live'; connected: boolean; discoveredCapabilities: string[] };
+        };
+
+        await refreshRuns();
+        const score = quickResult.summary?.score;
+        const scoreLabel = typeof score === 'number' ? ` (score ${score.toFixed(3)})` : '';
+        if (quickResult.connectivity?.mode === 'live') {
+          const discovered = quickResult.connectivity.discoveredCapabilities.length;
+          setMessage(`Connected to endpoint. Discovered ${discovered} capability(s). Quick test finished${scoreLabel}`);
+        } else {
+          setMessage(`Quick test finished${scoreLabel}`);
+        }
+        return;
       }
 
       const response = await fetch('/api/jobs', {
@@ -1082,16 +1201,62 @@ export default function HomePage() {
 
         <div className="queue-panel">
           <p className="cmd-label" style={{ marginTop: 20 }}>
+            Single input test (live):
+          </p>
+          <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
+            Type one input and click <strong>Run input test</strong>. The app connects to your MCP,
+            discovers tools, sends your input, and shows the raw response.
+          </p>
+
+          <div className="form-row" style={{ marginTop: 10 }}>
+            <div className="form-field full-width">
+              <label htmlFor="single-input-test">Your input</label>
+              <input
+                id="single-input-test"
+                type="text"
+                value={singleInputText}
+                onChange={(e) => setSingleInputText(e.target.value)}
+                placeholder="e.g. summarize today's key incidents"
+                disabled={isBusy || isJobBusy || isSingleInputBusy}
+              />
+            </div>
+          </div>
+
+          <div className="toolbar">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void handleRunSingleInputTest()}
+              disabled={isBusy || isJobBusy || isSingleInputBusy}
+            >
+              {isSingleInputBusy ? 'Running input test...' : 'Run input test'}
+            </button>
+          </div>
+
+          {singleInputResult ? (
+            <div className="token-block" style={{ marginTop: 10 }}>
+              <strong>Tool used: {singleInputTool || 'unknown'}</strong>
+              <div className="code" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
+                {singleInputResult}
+              </div>
+            </div>
+          ) : null}
+
+          <p className="cmd-label" style={{ marginTop: 20 }}>
             Quick MCP test:
           </p>
           <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
             Pick an endpoint and click <strong>Run quick test</strong>. If no runner is online, your
             test waits in queue until one connects.
           </p>
+          <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
+            Run quick test performs a real MCP initialize + tool discovery call (live mode), then stores
+            the result summary below.
+          </p>
 
           {onlineWorkerCount === 0 ? (
             <p className="help-text" style={{ marginTop: 0, marginBottom: 12 }}>
-              No runner online right now. Start one with:
+              No runner online right now. Quick test will run directly from web. To use queue mode, start a runner with:
               {' '}
               <code>npm run run-worker -- --control-plane http://localhost:3000</code>
             </p>
