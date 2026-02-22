@@ -90,6 +90,21 @@ This repo now includes a web control plane at `apps/web` using browser local sto
 
 5. Share state between people via **Download JSON** and re-upload on another browser.
 
+## Add MCP endpoint in UI
+
+1. Open the dashboard (`http://localhost:3000`).
+2. In **MCP Endpoints**, fill in:
+	- name
+	- transport (`sse`, `streamable-http`, or `stdio`)
+	- URL/command
+	- optional auth env var + notes
+3. Click **Create Endpoint**.
+4. Use the endpoint name in CLI runs (current runner labels server by this name):
+
+	`npm run run-suite:dry -- --server <endpoint-name> --model claude-sonnet`
+
+Endpoint profiles are currently stored in browser localStorage and are per-browser.
+
 The repository abstraction and DB stub are in [apps/web/lib/runRepository.ts](apps/web/lib/runRepository.ts) (`DatabaseRunRepository`).
 Switching to DB later means implementing that class and changing `createRunRepository('database')`.
 

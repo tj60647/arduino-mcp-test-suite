@@ -34,3 +34,13 @@ export interface StoredRun {
   createdAt: string;
   report: RunReport;
 }
+
+export interface McpEndpoint {
+  id: string;
+  name: string;
+  transport: 'sse' | 'stdio' | 'streamable-http';
+  urlOrCommand: string;
+  authEnvVar?: string;
+  notes?: string;
+  createdAt: string;
+}

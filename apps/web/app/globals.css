@@ -31,6 +31,22 @@ p {
   margin-bottom: 12px;
 }
 
+.endpoint-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+input,
+select {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
 button,
 .upload-label {
   border: 1px solid #cbd5e1;
