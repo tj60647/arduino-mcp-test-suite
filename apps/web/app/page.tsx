@@ -95,6 +95,7 @@ export default function HomePage() {
   const [jobTeam, setJobTeam] = useState('default');
   const [jobSubmittedBy, setJobSubmittedBy] = useState('local-user');
   const [jobDryRun, setJobDryRun] = useState(true);
+  const [showAdvancedJobOptions, setShowAdvancedJobOptions] = useState(false);
 
   const totals = useMemo(() => {
     const count = runs.length;
@@ -121,6 +122,17 @@ export default function HomePage() {
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (endpoints.length === 1 && !jobEndpointId) {
+      handleSelectJobEndpoint(endpoints[0].id);
+      return;
+    }
+
+    if (jobEndpointId && !endpoints.some((endpoint) => endpoint.id === jobEndpointId)) {
+      setJobEndpointId('');
+    }
+  }, [endpoints, jobEndpointId]);
 
   async function refreshRuns(): Promise<void> {
     const localRuns = await repository.listRuns();
@@ -419,14 +431,51 @@ export default function HomePage() {
     setJobDryRun(false);
   }
 
-  async function handleCreateJob(): Promise<void> {
-    if (!jobServerName.trim()) {
-      setMessage('Server name is required to queue a job.');
-      return;
+  function buildTransportConfigFromCurrentSelection():
+    | { type: 'stdio'; command: string; args: string[] }
+    | { type: 'sse' | 'streamable-http'; url: string }
+    | undefined {
+    if (jobDryRun) {
+      return undefined;
     }
 
-    if (!jobDryRun && !jobUrlOrCommand.trim()) {
-      setMessage('URL / command is required unless dry-run is enabled.');
+    const selectedEndpoint = endpoints.find((item) => item.id === jobEndpointId);
+    const effectiveTransport = selectedEndpoint?.transport ?? jobTransport;
+    const effectiveUrlOrCommand = selectedEndpoint?.urlOrCommand ?? jobUrlOrCommand;
+
+    if (!effectiveUrlOrCommand.trim()) {
+      throw new Error('URL / command is required unless dry-run is enabled.');
+    }
+
+    if (effectiveTransport === 'stdio') {
+      const parsed = parseStdioCommand(effectiveUrlOrCommand);
+      if (!parsed.command) {
+        throw new Error('For stdio transport, enter a launch command.');
+      }
+
+      return {
+        type: 'stdio',
+        command: parsed.command,
+        args: parsed.args
+      };
+    }
+
+    return {
+      type: effectiveTransport,
+      url: effectiveUrlOrCommand.trim()
+    };
+  }
+
+  async function queueJob(mode: 'quick' | 'advanced'): Promise<void> {
+    const selectedEndpoint = endpoints.find((item) => item.id === jobEndpointId);
+
+    const serverName =
+      mode === 'quick'
+        ? ((selectedEndpoint?.name ?? jobServerName.trim()) || 'mcp-endpoint')
+        : jobServerName.trim();
+
+    if (!serverName) {
+      setMessage('Server name is required to queue a job.');
       return;
     }
 
@@ -449,38 +498,21 @@ export default function HomePage() {
             | { type: 'sse' | 'streamable-http'; url: string };
         };
       } = {
-        team: jobTeam.trim() || 'default',
-        submittedBy: jobSubmittedBy.trim() || 'local-user',
+        team: mode === 'quick' ? 'default' : jobTeam.trim() || 'default',
+        submittedBy: mode === 'quick' ? 'web-quick-test' : jobSubmittedBy.trim() || 'local-user',
         config: {
-          suiteName: jobSuiteName.trim() || 'general',
+          suiteName: mode === 'quick' ? 'general' : jobSuiteName.trim() || 'general',
           benchmarkPack: 'general',
-          serverName: jobServerName.trim(),
-          modelName: jobModelName.trim() || 'claude-sonnet',
+          serverName,
+          modelName: mode === 'quick' ? 'quick-mcp-check' : jobModelName.trim() || 'claude-sonnet',
           dryRun: jobDryRun,
           deterministicWeight: 0.7
         }
       };
 
-      if (!jobDryRun) {
-        if (jobTransport === 'stdio') {
-          const parsed = parseStdioCommand(jobUrlOrCommand);
-          if (!parsed.command) {
-            setMessage('For stdio transport, enter a launch command.');
-            setIsJobBusy(false);
-            return;
-          }
-
-          payload.config.mcpTransportConfig = {
-            type: 'stdio',
-            command: parsed.command,
-            args: parsed.args
-          };
-        } else {
-          payload.config.mcpTransportConfig = {
-            type: jobTransport,
-            url: jobUrlOrCommand.trim()
-          };
-        }
+      const transportConfig = buildTransportConfigFromCurrentSelection();
+      if (transportConfig) {
+        payload.config.mcpTransportConfig = transportConfig;
       }
 
       const response = await fetch('/api/jobs', {
@@ -496,12 +528,20 @@ export default function HomePage() {
 
       const created = (await response.json()) as { id: string };
       await refreshJobs();
-      setMessage(`Job queued: ${created.id}`);
+      setMessage(mode === 'quick' ? `Quick test queued: ${created.id}` : `Job queued: ${created.id}`);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
       setIsJobBusy(false);
     }
+  }
+
+  async function handleCreateJob(): Promise<void> {
+    await queueJob('advanced');
+  }
+
+  async function handleCreateQuickJob(): Promise<void> {
+    await queueJob('quick');
   }
 
   return (
@@ -877,12 +917,16 @@ export default function HomePage() {
 
         <div className="queue-panel">
           <p className="cmd-label" style={{ marginTop: 20 }}>
-            Queue runs directly from web (worker must be running):
+            Quick MCP test (worker must be running):
+          </p>
+          <p className="help-text" style={{ marginTop: 0, marginBottom: 10 }}>
+            Pick an endpoint and click <strong>Queue quick test</strong>. Use advanced options only
+            if you need custom metadata.
           </p>
 
           <div className="form-row" style={{ marginTop: 10 }}>
             <div className="form-field">
-              <label htmlFor="job-endpoint-select">Use registered endpoint (optional)</label>
+              <label htmlFor="job-endpoint-select">Endpoint</label>
               <select
                 id="job-endpoint-select"
                 value={jobEndpointId}
@@ -909,6 +953,29 @@ export default function HomePage() {
             </div>
           </div>
 
+          <div className="toolbar">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void handleCreateQuickJob()}
+              disabled={isBusy || isJobBusy}
+            >
+              Queue quick test
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAdvancedJobOptions((current) => !current)}
+              disabled={isBusy || isJobBusy}
+            >
+              {showAdvancedJobOptions ? 'Hide advanced options' : 'Show advanced options'}
+            </button>
+            <button type="button" onClick={() => void refreshJobs()} disabled={isBusy || isJobBusy}>
+              Refresh jobs
+            </button>
+          </div>
+
+          {showAdvancedJobOptions ? (
+            <>
           <div className="form-row">
             <div className="form-field">
               <label htmlFor="job-transport">Connection type</label>
@@ -1009,16 +1076,14 @@ export default function HomePage() {
           <div className="toolbar">
             <button
               type="button"
-              className="btn-primary"
               onClick={() => void handleCreateJob()}
               disabled={isBusy || isJobBusy}
             >
-              Queue run
-            </button>
-            <button type="button" onClick={() => void refreshJobs()} disabled={isBusy || isJobBusy}>
-              Refresh jobs
+              Queue advanced run
             </button>
           </div>
+            </>
+          ) : null}
 
           <table style={{ marginTop: 14 }}>
             <thead>

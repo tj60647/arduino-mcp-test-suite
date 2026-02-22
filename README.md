@@ -75,7 +75,8 @@ See [docs/roadmap.md](docs/roadmap.md) and [docs/eval-spec.md](docs/eval-spec.md
 
 	`http://localhost:3000`
 
-6. In **Managed workers**, register an approved worker and confirm it is online, then queue a run from the web UI.
+6. In **Managed workers**, register an approved worker and confirm it is online.
+7. In **Queue a remote run**, pick your endpoint and click **Queue quick test**.
 
 ## Register approved workers (recommended)
 
