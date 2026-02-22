@@ -8,8 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev:all",
+    "dev": "npm run free:3000 && npm run dev:all",
     "dev:all": "concurrently \"npm run web:dev\"",
+    "free:3000": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$port=3000; $listeners=Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue; if ($listeners) { $listeners | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue; Write-Output ('Stopped PID ' + $_ + ' on port ' + $port) } } else { Write-Output ('No listener on port ' + $port) }\"",
     "build": "tsc -b tsconfig.json",
     "clean": "npm run -ws clean",
     "typecheck": "tsc -b tsconfig.json --pretty",

@@ -132,8 +132,6 @@ export default function HomePage() {
   useEffect(() => {
     void refreshRuns();
     void refreshEndpoints();
-    void refreshJobs();
-    void refreshWorkers();
   }, []);
 
   useEffect(() => {
@@ -159,16 +157,6 @@ export default function HomePage() {
       document.body.classList.remove('density-dense');
     };
   }, [denseMode]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      void refreshJobs();
-      void refreshRuns();
-      void refreshWorkers();
-    }, 3000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
 
   useEffect(() => {
     if (endpoints.length === 1 && !jobEndpointId) {
@@ -811,7 +799,7 @@ export default function HomePage() {
 
       {/* ── How it works ──────────────────────────────────────────────── */}
       <p className="help-text" style={{ margin: '0 0 16px' }}>
-        1) Paste MCP URL and connect. 2) Run quick test. 3) See results below.
+        1) Paste MCP URL and connect. 2) Run quick test. Results appear below automatically.
       </p>
 
       {/* ── Step 1: Register server ────────────────────────────────────── */}
@@ -1008,7 +996,6 @@ export default function HomePage() {
       {showAdvancedControls ? (
       <div className="section-card">
         <h2>
-          <span className="step-number small">2</span>
           Runner status (optional)
         </h2>
         <p className="section-desc">
@@ -1189,10 +1176,10 @@ export default function HomePage() {
       </div>
       ) : null}
 
-      {/* ── Step 2: Queue a remote run ─────────────────────────────────── */}
+      {/* ── Step 2: Run test ────────────────────────────────────────────── */}
       <div className="section-card">
         <h2>
-          <span className="step-number small">3</span>
+          <span className="step-number small">2</span>
           Run test
         </h2>
         <p className="section-desc">
@@ -1462,10 +1449,9 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Step 3: Results ───────────────────────────────────────────── */}
+      {/* ── Results ───────────────────────────────────────────────────── */}
       <div className="section-card">
         <h2>
-          <span className="step-number small">4</span>
           Test results
         </h2>
         <p className="section-desc">
