@@ -112,6 +112,8 @@ export default function HomePage() {
   const [singleInputResult, setSingleInputResult] = useState('');
   const [singleInputTool, setSingleInputTool] = useState('');
   const [isSingleInputBusy, setIsSingleInputBusy] = useState(false);
+  const [mcpInfoResult, setMcpInfoResult] = useState('');
+  const [isMcpInfoBusy, setIsMcpInfoBusy] = useState(false);
   const [showAdvancedJobOptions, setShowAdvancedJobOptions] = useState(false);
   const [showWorkerSetup, setShowWorkerSetup] = useState(false);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
@@ -669,6 +671,46 @@ export default function HomePage() {
       setMessage((error as Error).message);
     } finally {
       setIsSingleInputBusy(false);
+    }
+  }
+
+  async function handleGetMcpInfo(): Promise<void> {
+    setIsMcpInfoBusy(true);
+    setMessage('');
+    try {
+      const selectedEndpoint = endpoints.find((item) => item.id === jobEndpointId);
+      const serverName = (selectedEndpoint?.name ?? jobServerName).trim() || 'mcp-endpoint';
+      const transportConfig = buildLiveTransportConfigFromCurrentSelection();
+
+      const response = await fetch('/api/mcp-info', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          serverName,
+          mcpTransportConfig: transportConfig
+        })
+      });
+
+      const payload = (await response.json()) as {
+        connected?: boolean;
+        tools?: string[];
+        resources?: string[];
+        prompts?: string[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Get MCP info failed (${response.status})`);
+      }
+
+      setMcpInfoResult(JSON.stringify(payload, null, 2));
+      const toolCount = payload.tools?.length ?? 0;
+      setMessage(`Connected. Found ${toolCount} tool(s).`);
+    } catch (error) {
+      setMcpInfoResult('');
+      setMessage((error as Error).message);
+    } finally {
+      setIsMcpInfoBusy(false);
     }
   }
 
@@ -1260,13 +1302,29 @@ export default function HomePage() {
           <div className="toolbar">
             <button
               type="button"
+              onClick={() => void handleGetMcpInfo()}
+              disabled={isBusy || isJobBusy || isSingleInputBusy || isMcpInfoBusy}
+            >
+              {isMcpInfoBusy ? 'Getting MCP info...' : 'Get MCP info'}
+            </button>
+            <button
+              type="button"
               className="btn-primary"
               onClick={() => void handleRunSingleInputTest()}
-              disabled={isBusy || isJobBusy || isSingleInputBusy}
+              disabled={isBusy || isJobBusy || isSingleInputBusy || isMcpInfoBusy}
             >
               {isSingleInputBusy ? 'Running input test...' : 'Run input test'}
             </button>
           </div>
+
+          {mcpInfoResult ? (
+            <div className="token-block" style={{ marginTop: 10 }}>
+              <strong>MCP info</strong>
+              <div className="code" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
+                {mcpInfoResult}
+              </div>
+            </div>
+          ) : null}
 
           {singleInputResult ? (
             <div className="token-block" style={{ marginTop: 10 }}>
